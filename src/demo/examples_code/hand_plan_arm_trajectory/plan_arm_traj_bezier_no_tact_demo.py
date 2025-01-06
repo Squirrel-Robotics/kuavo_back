@@ -127,29 +127,7 @@ def call_change_arm_ctrl_mode_service(arm_ctrl_mode):
     finally:
         return result
     
-def load_json_file(file_path):
-    """
-    加载并解析JSON文件
-    
-    Args:
-        file_path: JSON文件路径
-        
-    Returns:
-        dict: 成功时返回解析后的JSON数据
-        None: 文件读取失败时返回None
-        
-    主要功能:
-    1. 打开并读取指定路径的JSON文件
-    2. 解析JSON数据为Python对象
-    3. 处理可能的IO异常
-    4. 返回解析结果
-    """
-    try:
-        with open(file_path, "r") as f:
-            return json.load(f)
-    except IOError as e:
-        rospy.logerr(f"Error reading file {file_path}: {e}")
-        return None
+
 
 def add_init_frame(frames):
     """
@@ -389,18 +367,31 @@ def stop_arm_trajectory_client():
         rospy.logerr(f"Service call failed: {e}")
         return False
 
+def create_action_data():
+    """
+    直接创建动作数据，而不是从.tact文件读取
+    
+    Returns:
+        list: 包含关键帧数据的列表
+    """
+    frames = [
+        {
+            "servos": [20,0,0,-30,0,0,0,20,0,0,-30,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "keyframe": 50,
+            "attribute": {str(i+1): {"CP": [[0,0],[21,0]]} for i in range(28)}
+        },
+        {
+            "servos": [20,0,0,-30,0,0,0,-30,0,30,-88,8,-22,-4,0,0,0,0,0,0,0,0,90,90,90,90,0,0],
+            "keyframe": 120,
+            "attribute": {str(i+1): {"CP": [[-21,0],[22.8,0]]} for i in range(28)}
+        },
+        # 可以继续添加更多关键帧...
+    ]
+    return {"frames": frames}
+
 def main():
     """
-    主函数流程：
-    1. 初始化ROS节点
-    2. 创建必要的订阅者和发布者:
-       - 订阅贝塞尔曲线轨迹话题
-       - 发布手臂轨迹控制命令
-       - 订阅传感器数据
-    3. 切换手臂控制模式为2(双臂控制)
-    4. 加载动作文件(.tact格式)
-    5. 生成和执行轨迹规划
-    6. 以100Hz的频率发布轨迹数据
+    主函数修改
     """
     # 初始化ROS节点
     rospy.init_node('arm_trajectory_bezier_demo')
@@ -419,11 +410,8 @@ def main():
     # 切换手臂控制模式为双臂控制
     call_change_arm_ctrl_mode_service(2)
     
-    # 加载动作文件
-    file_path = rospy.get_param('~tact_file', './action_files/welcome.tact')
-    data = load_json_file(file_path)
-    if not data:
-        return
+    # 直接创建动作数据，替代从文件读取
+    data = create_action_data()
 
     # 生成轨迹规划请求
     action_data = add_init_frame(data["frames"])
@@ -453,3 +441,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
