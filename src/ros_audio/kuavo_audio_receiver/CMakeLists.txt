@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(kuavo_msgs)
+project(kuavo_audio_receiver)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -8,11 +8,8 @@ project(kuavo_msgs)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  message_generation
-  message_runtime
-  geometry_msgs
-  std_msgs
-  trajectory_msgs
+  rospy
+  kuavo_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -49,124 +46,16 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-add_message_files(
-  FILES
-  imuData.msg
-  jointData.msg
-  sensorsData.msg
-  endEffectorData.msg
-  jointCmd.msg
-  robotState.msg
-  armPoseWithTimeStamp.msg
-  headBodyPose.msg
-  robotHandPosition.msg
-  picoPoseInfo.msg
-  picoPoseInfoList.msg
-  gaitTimeName.msg
-  JoySticks.msg
-  armTargetPoses.msg
-  robotHeadMotionData.msg
-  robotBodyMatrices.msg
-  footPose.msg
-  footPose6D.msg
-  footPoses.msg
-  footPoses6D.msg
-  footPoseTargetTrajectories.msg
-  footPose6DTargetTrajectories.msg
-  gestureInfo.msg
-  gestureTask.msg
-  lejuClawState.msg
-  Metadata.msg
-  switchGaitByName.msg
-  lejuClawCommand.msg
-  dexhandCommand.msg
-  touchSensorStatus.msg
-  dexhandTouchState.msg
-  yoloOutputData.msg
-  yoloDetection.msg
-  AprilTagDetection.msg
-  AprilTagDetectionArray.msg
-  motorParam.msg
-  footPoseWithVision.msg
-  footPoseWithVisionArray.msg
-
-  # motion_capture_ik
-  robotArmQVVD.msg
-  ikSolveError.msg
-  handPose.msg
-  armHandPose.msg
-  twoArmHandPose.msg
-  headBodyPose.msg
-  ikSolveParam.msg
-  twoArmHandPoseCmd.msg
-  robotHandPosition.msg
-  headBodyPose.msg
-  bezierCurveCubicPoint.msg
-  jointBezierTrajectory.msg
-  planArmState.msg
-  RobotActionState.msg
-  tagDataArray.msg
-  qv.msg
-  fullBodyTargetTrajectories.msg
-
-  # kuavo_tf2_web_republisher
-  TFArray.msg
-  armHandPoseFree.msg
-  twoArmHandPoseCmdFree.msg
-  twoArmHandPoseFree.msg
-
-  JoySticks.msg
-
-  # kuavo_arm_collision_check
-  armCollisionCheckInfo.msg
-
-  MmDetectionMsg.msg
-  AudioReceiverData.msg
-)
+# add_message_files(
+#   FILES
+#   Message1.msg
+#   Message2.msg
+# )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  jointMoveTo.srv
-  setHwIntialState.srv
-  changeArmCtrlMode.srv
-  singleStepControl.srv
-  changeTorsoCtrlMode.srv
-  setMotorEncoderRoundService.srv
-  gestureExecute.srv
-  gestureList.srv
-  gestureExecuteState.srv
-  controlLejuClaw.srv
-  setTagId.srv
-  footPoseTargetTrajectoriesSrv.srv
-  footPose6DTargetTrajectoriesSrv.srv
-  getCurrentGaitName.srv
-  handForceLevel.srv
-  enableHandTouchSensor.srv
-  playmusic.srv
-  changeMotorParam.srv
-  getMotorParam.srv
-
-  # motion_capture_ik
-  changeArmCtrlMode.srv
-  twoArmHandPoseCmdSrv.srv
-  changeArmCtrlModeKuavo.srv
-  fkSrv.srv
-
-  SpeechSynthesis.srv
-  setMmCtrlFrame.srv
-  GetTargetPartPoseInCamera.srv
-  ExecuteArmAction.srv
-  planArmTrajectoryBezierCurve.srv
-  planArmTrajectoryCubicSpline.srv
-  SetJoyTopic.srv
-  SetLEDMode.srv
-
-  # kuavo_tf2_web_republisher
-  RepublishTFs.srv
-
-  twoArmHandPoseCmdFreeSrv.srv
-)
+# add_service_files(
+#   FILES
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -176,12 +65,10 @@ add_service_files(
 # )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs  # Or other packages containing msgs
-  geometry_msgs
-  trajectory_msgs
-)
+# generate_messages(
+#   DEPENDENCIES
+#   std_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -213,11 +100,15 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-# #  INCLUDE_DIRS include
-#  LIBRARIES kuavo_msgs
- CATKIN_DEPENDS message_generation message_runtime 
-# #  DEPENDS system_lib
+#  INCLUDE_DIRS include
+#  LIBRARIES kuavo_robot_ros
+#  CATKIN_DEPENDS roscpp rospy
+#  DEPENDS system_lib
+  CATKIN_DEPENDS 
+  rospy 
+  kuavo_msgs
 )
+
 
 ###########
 ## Build ##
@@ -232,7 +123,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/kuavo_msgs.cpp
+#   src/${PROJECT_NAME}/kuavo_audio_player.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -243,7 +134,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/kuavo_msgs_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/kuavo_audio_player_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -307,10 +198,19 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_kuavo_msgs.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_kuavo_audio_player.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+install(DIRECTORY launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS
+  scripts/micphone_receiver_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
