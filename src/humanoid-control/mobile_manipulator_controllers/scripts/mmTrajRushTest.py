@@ -101,7 +101,7 @@ def main():
 
     # Path to the CSV file
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_file_name = '../data/mm_poses_1.csv'
+    csv_file_name = '../data/mm_poses_0.csv'
     file_path = os.path.join(script_dir, csv_file_name)
 
     if not os.path.isfile(file_path):
@@ -117,15 +117,13 @@ def main():
     # Before publishing, call the service to set the control mode to 3 (BaseArm)
     # This allows the controller to process trajectories for the base and arms.
 
-    for i in range(10):
+    for i in range(100):
 
-        change_mm_ctrl_mode(1)
         change_arm_ctrl_mode(2)
         srv_change_manipulation_mpc_control_flow(2)
         msg = armTargetPoses()
         msg.times = times
         msg.values = values
-        msg.frame = 2   # 0 keep current frame  1 world frame (based on odom)  2  local frame  3  VRFrame  4  manipulation world frame
 
         rospy.loginfo("Publishing mobile manipulator target poses to topic '/mm/end_effector_trajectory'")
         
@@ -137,14 +135,15 @@ def main():
 
         # reset_mm_mpc()
         
+        change_mm_ctrl_mode(1)
         if not rospy.is_shutdown():
             pub.publish(msg)
             rospy.loginfo("Message published.")
-        rospy.sleep(15)
+        rospy.sleep(0.5)
         change_mm_ctrl_mode(0)
         change_arm_ctrl_mode(1)
         srv_change_manipulation_mpc_control_flow(0)
-        rospy.sleep(4)
+        rospy.sleep(0.1)
     
     # After publishing, you might want to switch back to another mode.
     # For example, setting it to 0 (None) will stop the controller from following trajectories.
