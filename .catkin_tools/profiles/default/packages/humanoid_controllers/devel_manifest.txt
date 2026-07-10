@@ -1,0 +1,12 @@
+humanoid-control/humanoid_controllers
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/share/humanoid_controllers/cmake/humanoid_controllersConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_controllers/cmake/humanoid_controllersConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/share/humanoid_controllers/cmake/humanoid_controllersConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_controllers/cmake/humanoid_controllersConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/libarm_torque_controller.so /home/lab/kuavo-ros-opensource/devel/lib/libarm_torque_controller.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/libhumanoid_interface_shm.so /home/lab/kuavo-ros-opensource/devel/lib/libhumanoid_interface_shm.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/libhumanoid_controllers.so /home/lab/kuavo-ros-opensource/devel/lib/libhumanoid_controllers.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/libnodelet_player.so /home/lab/kuavo-ros-opensource/devel/lib/libnodelet_player.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/libnodelet_controller.so /home/lab/kuavo-ros-opensource/devel/lib/libnodelet_controller.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/humanoid_controllers/cheat_controller_node /home/lab/kuavo-ros-opensource/devel/lib/humanoid_controllers/cheat_controller_node
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/humanoid_controllers/normal_controller_node /home/lab/kuavo-ros-opensource/devel/lib/humanoid_controllers/normal_controller_node
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/humanoid_controllers/humanoid_target_trajectories_publisher /home/lab/kuavo-ros-opensource/devel/lib/humanoid_controllers/humanoid_target_trajectories_publisher
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_controllers/lib/pkgconfig/humanoid_controllers.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/humanoid_controllers.pc

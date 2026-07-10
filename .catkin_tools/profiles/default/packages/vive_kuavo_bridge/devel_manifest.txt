@@ -1,0 +1,4 @@
+vive_kuavo_bridge
+/home/lab/kuavo-ros-opensource/devel/.private/vive_kuavo_bridge/share/vive_kuavo_bridge/cmake/vive_kuavo_bridgeConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/vive_kuavo_bridge/cmake/vive_kuavo_bridgeConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/vive_kuavo_bridge/share/vive_kuavo_bridge/cmake/vive_kuavo_bridgeConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/vive_kuavo_bridge/cmake/vive_kuavo_bridgeConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/vive_kuavo_bridge/lib/pkgconfig/vive_kuavo_bridge.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/vive_kuavo_bridge.pc

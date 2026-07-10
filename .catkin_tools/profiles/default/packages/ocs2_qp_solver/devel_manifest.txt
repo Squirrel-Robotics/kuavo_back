@@ -1,0 +1,5 @@
+ocs2/ocs2_test_tools/ocs2_qp_solver
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_qp_solver/share/ocs2_qp_solver/cmake/ocs2_qp_solverConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_qp_solver/cmake/ocs2_qp_solverConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_qp_solver/share/ocs2_qp_solver/cmake/ocs2_qp_solverConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_qp_solver/cmake/ocs2_qp_solverConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_qp_solver/lib/libocs2_qp_solver.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_qp_solver.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_qp_solver/lib/pkgconfig/ocs2_qp_solver.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_qp_solver.pc

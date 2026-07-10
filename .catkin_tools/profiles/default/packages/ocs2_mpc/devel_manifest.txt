@@ -1,0 +1,6 @@
+ocs2/ocs2_mpc
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mpc/share/ocs2_mpc/cmake/ocs2_mpcConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_mpc/cmake/ocs2_mpcConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mpc/share/ocs2_mpc/cmake/ocs2_mpcConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_mpc/cmake/ocs2_mpcConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mpc/lib/libocs2_mpc.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_mpc.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mpc/lib/pkgconfig/ocs2_mpc.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_mpc.pc
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mpc/lib/ocs2_mpc/ocs2_mpc_lintTarget /home/lab/kuavo-ros-opensource/devel/lib/ocs2_mpc/ocs2_mpc_lintTarget

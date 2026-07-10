@@ -1,0 +1,5 @@
+humanoid-control/joystick_drivers/joy
+/home/lab/kuavo-ros-opensource/devel/.private/joy/share/joy/cmake/joyConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/joy/cmake/joyConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/joy/share/joy/cmake/joyConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/joy/cmake/joyConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/joy/lib/joy/joy_node /home/lab/kuavo-ros-opensource/devel/lib/joy/joy_node
+/home/lab/kuavo-ros-opensource/devel/.private/joy/lib/pkgconfig/joy.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/joy.pc

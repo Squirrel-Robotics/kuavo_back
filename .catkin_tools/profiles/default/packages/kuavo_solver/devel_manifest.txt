@@ -1,0 +1,5 @@
+kuavo_solver
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_solver/share/kuavo_solver/cmake/kuavo_solverConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_solver/cmake/kuavo_solverConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_solver/share/kuavo_solver/cmake/kuavo_solverConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_solver/cmake/kuavo_solverConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_solver/lib/libkuavo_solver.so /home/lab/kuavo-ros-opensource/devel/lib/libkuavo_solver.so
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_solver/lib/pkgconfig/kuavo_solver.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/kuavo_solver.pc

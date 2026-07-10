@@ -1,0 +1,7 @@
+kuavo_led/kuavo_led_controller
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_led_controller/share/kuavo_led_controller/cmake/kuavo_led_controllerConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_led_controller/cmake/kuavo_led_controllerConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_led_controller/share/kuavo_led_controller/cmake/kuavo_led_controllerConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_led_controller/cmake/kuavo_led_controllerConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_led_controller/lib/kuavo_led_controller/battery_info_node.py /home/lab/kuavo-ros-opensource/devel/lib/kuavo_led_controller/battery_info_node.py
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_led_controller/lib/kuavo_led_controller/led_strip_service.py /home/lab/kuavo-ros-opensource/devel/lib/kuavo_led_controller/led_strip_service.py
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_led_controller/lib/kuavo_led_controller/kuavo_led_controller_node.py /home/lab/kuavo-ros-opensource/devel/lib/kuavo_led_controller/kuavo_led_controller_node.py
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_led_controller/lib/pkgconfig/kuavo_led_controller.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/kuavo_led_controller.pc

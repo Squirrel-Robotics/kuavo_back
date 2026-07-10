@@ -1,0 +1,5 @@
+gazebo/realsense_sim_metadata
+/home/lab/kuavo-ros-opensource/devel/.private/realsense_sim_metadata/share/realsense_sim_metadata/cmake/realsense_sim_metadataConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/realsense_sim_metadata/cmake/realsense_sim_metadataConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/realsense_sim_metadata/share/realsense_sim_metadata/cmake/realsense_sim_metadataConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/realsense_sim_metadata/cmake/realsense_sim_metadataConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/realsense_sim_metadata/lib/pkgconfig/realsense_sim_metadata.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/realsense_sim_metadata.pc
+/home/lab/kuavo-ros-opensource/devel/.private/realsense_sim_metadata/lib/realsense_sim_metadata/camera_metadata_sim_pub /home/lab/kuavo-ros-opensource/devel/lib/realsense_sim_metadata/camera_metadata_sim_pub

@@ -1,0 +1,6 @@
+ocs2/ocs2_core
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_core/share/ocs2_core/cmake/ocs2_coreConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_core/cmake/ocs2_coreConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_core/share/ocs2_core/cmake/ocs2_coreConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_core/cmake/ocs2_coreConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_core/lib/libocs2_core.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_core.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_core/lib/pkgconfig/ocs2_core.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_core.pc
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_core/lib/ocs2_core/ocs2_core_lintTarget /home/lab/kuavo-ros-opensource/devel/lib/ocs2_core/ocs2_core_lintTarget

@@ -1,0 +1,5 @@
+ocs2/ocs2_pinocchio/ocs2_pinocchio_interface
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_pinocchio_interface/share/ocs2_pinocchio_interface/cmake/ocs2_pinocchio_interfaceConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_pinocchio_interface/cmake/ocs2_pinocchio_interfaceConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_pinocchio_interface/share/ocs2_pinocchio_interface/cmake/ocs2_pinocchio_interfaceConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_pinocchio_interface/cmake/ocs2_pinocchio_interfaceConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_pinocchio_interface/lib/libocs2_pinocchio_interface.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_pinocchio_interface.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_pinocchio_interface/lib/pkgconfig/ocs2_pinocchio_interface.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_pinocchio_interface.pc

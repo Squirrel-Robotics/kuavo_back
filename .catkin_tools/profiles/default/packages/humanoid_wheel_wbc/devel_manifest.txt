@@ -1,0 +1,5 @@
+humanoid-wheel-control/humanoid_wheel_wbc
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_wbc/share/humanoid_wheel_wbc/cmake/humanoid_wheel_wbcConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_wheel_wbc/cmake/humanoid_wheel_wbcConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_wbc/share/humanoid_wheel_wbc/cmake/humanoid_wheel_wbcConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_wheel_wbc/cmake/humanoid_wheel_wbcConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_wbc/lib/libhumanoid_wheel_wbc.so /home/lab/kuavo-ros-opensource/devel/lib/libhumanoid_wheel_wbc.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_wbc/lib/pkgconfig/humanoid_wheel_wbc.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/humanoid_wheel_wbc.pc

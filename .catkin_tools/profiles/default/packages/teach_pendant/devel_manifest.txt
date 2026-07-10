@@ -1,0 +1,4 @@
+manipulation_nodes/teach_pendant
+/home/lab/kuavo-ros-opensource/devel/.private/teach_pendant/share/teach_pendant/cmake/teach_pendantConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/teach_pendant/cmake/teach_pendantConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/teach_pendant/share/teach_pendant/cmake/teach_pendantConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/teach_pendant/cmake/teach_pendantConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/teach_pendant/lib/pkgconfig/teach_pendant.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/teach_pendant.pc

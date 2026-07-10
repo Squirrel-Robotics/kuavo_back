@@ -1,0 +1,5 @@
+ocs2/ocs2_pinocchio/ocs2_centroidal_model
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_centroidal_model/share/ocs2_centroidal_model/cmake/ocs2_centroidal_modelConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_centroidal_model/cmake/ocs2_centroidal_modelConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_centroidal_model/share/ocs2_centroidal_model/cmake/ocs2_centroidal_modelConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_centroidal_model/cmake/ocs2_centroidal_modelConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_centroidal_model/lib/libocs2_centroidal_model.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_centroidal_model.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_centroidal_model/lib/pkgconfig/ocs2_centroidal_model.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_centroidal_model.pc

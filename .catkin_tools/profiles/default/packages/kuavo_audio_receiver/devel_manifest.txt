@@ -1,0 +1,5 @@
+ros_audio/kuavo_audio_receiver
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_audio_receiver/share/kuavo_audio_receiver/cmake/kuavo_audio_receiverConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_audio_receiver/cmake/kuavo_audio_receiverConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_audio_receiver/share/kuavo_audio_receiver/cmake/kuavo_audio_receiverConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_audio_receiver/cmake/kuavo_audio_receiverConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_audio_receiver/lib/pkgconfig/kuavo_audio_receiver.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/kuavo_audio_receiver.pc
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_audio_receiver/lib/kuavo_audio_receiver/micphone_receiver_node.py /home/lab/kuavo-ros-opensource/devel/lib/kuavo_audio_receiver/micphone_receiver_node.py

@@ -1,0 +1,6 @@
+ocs2/ocs2_ddp
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ddp/share/ocs2_ddp/cmake/ocs2_ddpConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_ddp/cmake/ocs2_ddpConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ddp/share/ocs2_ddp/cmake/ocs2_ddpConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_ddp/cmake/ocs2_ddpConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ddp/lib/libocs2_ddp.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_ddp.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ddp/lib/ocs2_ddp/ocs2_ddp_lintTarget /home/lab/kuavo-ros-opensource/devel/lib/ocs2_ddp/ocs2_ddp_lintTarget
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ddp/lib/pkgconfig/ocs2_ddp.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_ddp.pc

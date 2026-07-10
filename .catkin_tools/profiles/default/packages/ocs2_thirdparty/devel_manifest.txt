@@ -1,0 +1,4 @@
+ocs2/ocs2_thirdparty
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_thirdparty/share/ocs2_thirdparty/cmake/ocs2_thirdpartyConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_thirdparty/cmake/ocs2_thirdpartyConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_thirdparty/share/ocs2_thirdparty/cmake/ocs2_thirdpartyConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_thirdparty/cmake/ocs2_thirdpartyConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_thirdparty/lib/pkgconfig/ocs2_thirdparty.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_thirdparty.pc

@@ -1,0 +1,7 @@
+mujoco
+/home/lab/kuavo-ros-opensource/devel/.private/mujoco_cpp/share/mujoco_cpp/cmake/mujoco_cppConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/mujoco_cpp/cmake/mujoco_cppConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/mujoco_cpp/share/mujoco_cpp/cmake/mujoco_cppConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/mujoco_cpp/cmake/mujoco_cppConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/mujoco_cpp/lib/libnodelet_mujoco.so /home/lab/kuavo-ros-opensource/devel/lib/libnodelet_mujoco.so
+/home/lab/kuavo-ros-opensource/devel/.private/mujoco_cpp/lib/libmujoco_cpp.so /home/lab/kuavo-ros-opensource/devel/lib/libmujoco_cpp.so
+/home/lab/kuavo-ros-opensource/devel/.private/mujoco_cpp/lib/pkgconfig/mujoco_cpp.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/mujoco_cpp.pc
+/home/lab/kuavo-ros-opensource/devel/.private/mujoco_cpp/lib/mujoco_cpp/mujoco_cpp_simulate /home/lab/kuavo-ros-opensource/devel/lib/mujoco_cpp/mujoco_cpp_simulate

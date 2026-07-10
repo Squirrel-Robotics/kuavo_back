@@ -1,0 +1,8 @@
+kuavo_sdk
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/share/kuavo_sdk/cmake/kuavo_sdkConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_sdk/cmake/kuavo_sdkConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/share/kuavo_sdk/cmake/kuavo_sdkConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_sdk/cmake/kuavo_sdkConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/share/kuavo_sdk/cmake/kuavo_sdk-msg-extras.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_sdk/cmake/kuavo_sdk-msg-extras.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/share/kuavo_sdk/cmake/kuavo_sdk-msg-paths.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_sdk/cmake/kuavo_sdk-msg-paths.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/share/roseus/ros/kuavo_sdk/manifest.l /home/lab/kuavo-ros-opensource/devel/share/roseus/ros/kuavo_sdk/manifest.l
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/lib/python3/dist-packages/kuavo_sdk/__init__.py /home/lab/kuavo-ros-opensource/devel/lib/python3/dist-packages/kuavo_sdk/__init__.py
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_sdk/lib/pkgconfig/kuavo_sdk.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/kuavo_sdk.pc

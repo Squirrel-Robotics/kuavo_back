@@ -1,0 +1,5 @@
+ocs2/ocs2_ipm
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ipm/share/ocs2_ipm/cmake/ocs2_ipmConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_ipm/cmake/ocs2_ipmConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ipm/share/ocs2_ipm/cmake/ocs2_ipmConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_ipm/cmake/ocs2_ipmConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ipm/lib/libocs2_ipm.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_ipm.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_ipm/lib/pkgconfig/ocs2_ipm.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_ipm.pc

@@ -1,0 +1,61 @@
+model_path: /home/lab/kuavo-ros-opensource/src/kuavo_assets/models/biped_s62/urdf/drake/biped_v3_upper_body.urdf
+control_hand_side: 2
+model_config_file: /home/lab/kuavo-ros-opensource/src/kuavo_assets/config/kuavo_v62/kuavo.json
+single_arm_num: 7
+custom_eef_frame_pos:  0  0 -0
+original frame_name: 
+ base_link
+ zarm_l7_end_effector
+ zarm_r7_end_effector
+ zarm_l4_link
+ zarm_r4_link
+print_ik_info: 1
+Work space radius: 0.7082
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++ IK RESULT INFO +++++++++++++++++++
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Eef cmd: 
+  Left pos:  0.236  0.254 -0.241
+  Left quat:  0.001 -0.504 -0.000  0.864
+  Right pos:  0.236 -0.254 -0.242
+  Right quat: -0.000 -0.502  0.000  0.865
+Result:
+  q:  0.518  0.002  0.001 -1.571  0.000  0.000 -0.003  0.518 -0.002 -0.001 -1.571  0.000  0.000  0.000
+  Left eef pos:  0.236  0.254 -0.241, Left eef quat:  0.001 -0.504 -0.000  0.864
+  Left pos error: 0.000 0.000 0.000, error norm: 0.000 mm.
+  Right eef pos:  0.236 -0.254 -0.242, Right eef quat: -0.001 -0.502  0.000  0.865
+  Right pos error: -0.000 -0.000  0.000, error norm: 0.201 mm.
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+[31mWARNING: disk usage in log directory [/home/lab/.ros/log] is over 1GB.
+It's recommended that you use the 'rosclean' command.[0m
+... logging to /home/lab/.ros/log/cf5c5938-7359-11f1-ac29-b5572e023d36/roslaunch-AAEON-19639.log
+Checking log directory for disk usage. This may take a while.
+Press Ctrl-C to interrupt
+]2;/home/lab/kuavo-ros-opensource/src/manipulation_nodes/motion_capture_ik/launch/ik_node.launch
+[1mstarted roslaunch server http://AAEON:44239/[0m
+
+SUMMARY
+========
+
+PARAMETERS
+ * /control_hand_side: 2
+ * /enable_ik_vis: True
+ * /model_path: /home/lab/kuavo-r...
+ * /print_ik_info: False
+ * /robot_version: 62
+ * /rosdistro: noetic
+ * /rosversion: 1.17.4
+ * /use_upper_body_urdf: True
+
+NODES
+  /
+    arms_ik_node (motion_capture_ik/arms_ik_node)
+
+[1mROS_MASTER_URI=http://localhost:11311[0m
+]2;/home/lab/kuavo-ros-opensource/src/manipulation_nodes/motion_capture_ik/launch/ik_node.launch http://localhost:11311
+[1mprocess[arms_ik_node-1]: started with pid [19678][0m
+[arms_ik_node-1] killing on exit
+shutting down processing monitor...
+... shutting down processing monitor complete
+[1mdone[0m

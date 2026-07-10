@@ -1,0 +1,5 @@
+kuavo_assets
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_assets/share/kuavo_assets/cmake/kuavo_assetsConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_assets/cmake/kuavo_assetsConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_assets/share/kuavo_assets/cmake/kuavo_assetsConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/kuavo_assets/cmake/kuavo_assetsConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_assets/lib/libkuavo_assets.so /home/lab/kuavo-ros-opensource/devel/lib/libkuavo_assets.so
+/home/lab/kuavo-ros-opensource/devel/.private/kuavo_assets/lib/pkgconfig/kuavo_assets.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/kuavo_assets.pc

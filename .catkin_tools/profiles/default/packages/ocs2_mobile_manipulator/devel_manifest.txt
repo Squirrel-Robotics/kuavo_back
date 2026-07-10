@@ -1,0 +1,5 @@
+ocs2/ocs2_robotic_examples/ocs2_mobile_manipulator
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mobile_manipulator/share/ocs2_mobile_manipulator/cmake/ocs2_mobile_manipulatorConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_mobile_manipulator/cmake/ocs2_mobile_manipulatorConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mobile_manipulator/share/ocs2_mobile_manipulator/cmake/ocs2_mobile_manipulatorConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_mobile_manipulator/cmake/ocs2_mobile_manipulatorConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mobile_manipulator/lib/libocs2_mobile_manipulator.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_mobile_manipulator.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_mobile_manipulator/lib/pkgconfig/ocs2_mobile_manipulator.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_mobile_manipulator.pc

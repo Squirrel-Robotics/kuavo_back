@@ -1,0 +1,4 @@
+humanoid-control/humanoid_common
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_common/share/humanoid_common/cmake/humanoid_commonConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_common/cmake/humanoid_commonConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_common/share/humanoid_common/cmake/humanoid_commonConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_common/cmake/humanoid_commonConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_common/lib/pkgconfig/humanoid_common.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/humanoid_common.pc

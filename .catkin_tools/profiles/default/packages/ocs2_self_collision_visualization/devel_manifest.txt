@@ -1,0 +1,5 @@
+ocs2/ocs2_pinocchio/ocs2_self_collision_visualization
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_self_collision_visualization/share/ocs2_self_collision_visualization/cmake/ocs2_self_collision_visualizationConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_self_collision_visualization/cmake/ocs2_self_collision_visualizationConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_self_collision_visualization/share/ocs2_self_collision_visualization/cmake/ocs2_self_collision_visualizationConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/ocs2_self_collision_visualization/cmake/ocs2_self_collision_visualizationConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_self_collision_visualization/lib/libocs2_self_collision_visualization.so /home/lab/kuavo-ros-opensource/devel/lib/libocs2_self_collision_visualization.so
+/home/lab/kuavo-ros-opensource/devel/.private/ocs2_self_collision_visualization/lib/pkgconfig/ocs2_self_collision_visualization.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/ocs2_self_collision_visualization.pc

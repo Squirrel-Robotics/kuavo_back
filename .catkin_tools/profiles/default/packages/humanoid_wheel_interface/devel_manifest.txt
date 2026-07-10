@@ -1,0 +1,5 @@
+humanoid-wheel-control/humanoid_wheel_interface
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_interface/share/humanoid_wheel_interface/cmake/humanoid_wheel_interfaceConfig-version.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_wheel_interface/cmake/humanoid_wheel_interfaceConfig-version.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_interface/share/humanoid_wheel_interface/cmake/humanoid_wheel_interfaceConfig.cmake /home/lab/kuavo-ros-opensource/devel/share/humanoid_wheel_interface/cmake/humanoid_wheel_interfaceConfig.cmake
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_interface/lib/libhumanoid_wheel_interface.so /home/lab/kuavo-ros-opensource/devel/lib/libhumanoid_wheel_interface.so
+/home/lab/kuavo-ros-opensource/devel/.private/humanoid_wheel_interface/lib/pkgconfig/humanoid_wheel_interface.pc /home/lab/kuavo-ros-opensource/devel/lib/pkgconfig/humanoid_wheel_interface.pc

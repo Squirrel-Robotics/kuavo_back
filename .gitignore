@@ -1,0 +1,13 @@
+
+# build outputs
+build/
+devel/
+install/
+logs/
+
+# large binary/runtime files
+*.bag
+*.apk
+*.so
+*.a
+*.gif
