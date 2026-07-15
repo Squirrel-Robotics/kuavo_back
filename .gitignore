@@ -71,3 +71,14 @@ src/legged_perceptive
 *.log
 EC_log/
 .catkin_tools/
+
+# ROS build outputs
+/build/
+/devel/
+/install/
+/logs/
+/.catkin_tools/
+
+# Python cache
+**/__pycache__/
+*.py[cod]
