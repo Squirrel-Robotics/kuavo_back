@@ -1,0 +1,128 @@
+<?xml version="1.0" ?>
+
+<launch>
+    <!-- ============================================================
+    load_kuavo_real_wheel_vive.launch
+    轮臂机器人 + Vive Ultimate Tracker 手臂遥操作
+
+    管线:
+      Vive Tracker → vive_arm_bridge.py → /ik/two_arm_hand_pose_cmd
+      → arms_ik_node → /kuavo_arm_traj → 轨迹平滑 → 硬件
+
+    启动:
+      cd kuavo-ros-opensource-master
+      roslaunch vive/load_kuavo_real_wheel_vive.launch
+      roslaunch vive/load_kuavo_real_wheel_vive.launch source_type:=udp
+      roslaunch vive/load_kuavo_real_wheel_vive.launch source_type:=mock
+    ============================================================ -->
+
+    <!-- Safety default: start robot control and IK services, but do not start the
+         Vive bridge that publishes /ik/two_arm_hand_pose_cmd unless explicitly requested. -->
+    <arg name="start_vive_bridge" default="false"/>
+    <arg name="robot_version" default="$(optenv ROBOT_VERSION 62)"/>
+    <arg name="with_ik" default="true"/>
+
+    <!-- ========== Vive Bridge 参数 ========== -->
+    <arg name="source_type"          default="udp" doc="openvr | udp | mock"/>
+    <arg name="udp_port"             default="11051"/>
+    <arg name="publish_rate"         default="20"/>
+    <arg name="position_scale"       default="0.2"/>
+    <arg name="max_delta_pos"        default="0.02"/>
+    <arg name="enable_left"          default="false"/>
+    <arg name="enable_right"         default="true"/>
+    <arg name="ee_frame_left"        default="zarm_l7_end_effector"/>
+    <arg name="ee_frame_right"       default="zarm_r7_end_effector"/>
+    <arg name="q0_topic"             default="/sensors_data_raw"/>
+    <arg name="q0_topic_type"        default="sensors_data"/>
+    <arg name="q0_arm_start_index"   default="4"/>
+    <arg name="q0_units"             default="rad"/>
+    <arg name="require_q0"           default="true"/>
+    <arg name="q0_wait_timeout"      default="10.0"/>
+    <arg name="min_q0_norm"          default="0.5"/>
+    <arg name="max_q0_step"          default="0.5"/>
+    <arg name="fk_service"           default="/ik/fk_srv"/>
+    <arg name="use_position_axis_map" default="true"/>
+    <arg name="map_x"                default="z"/>
+    <arg name="map_y"                default="-y"/>
+    <arg name="map_z"                default="-x"/>
+    <arg name="enable_orientation"   default="false"/>
+    <arg name="orientation_scale"    default="0.25"/>
+    <arg name="max_orientation_delta_deg" default="5.0"/>
+    <arg name="rot_map_roll"         default="-roll"/>
+    <arg name="rot_map_pitch"        default="-pitch"/>
+    <arg name="rot_map_yaw"          default="-yaw"/>
+    <arg name="orientation_apply_order" default="local"/>
+    <arg name="tracker_timeout"      default="0.5"/>
+    <arg name="max_tracker_raw_step" default="0.20"/>
+    <arg name="max_tracker_target_step" default="0.05"/>
+
+    <!-- ========== 基础轮臂控制 ========== -->
+    <include file="$(find humanoid_controllers)/launch/load_kuavo_real_wheel.launch">
+        <arg name="robot_version"    value="$(arg robot_version)"/>
+        <arg name="with_ik"          value="$(arg with_ik)"/>
+        <arg name="vr_remote_control" value="true"/>   <!-- 启用 VR 远程控制模式 -->
+        <arg name="use_joystick"      value="false"/>  <!-- 禁用手柄, 避免冲突 -->
+        <arg name="use_external_mpc"  value="true"/>   <!-- 使用外部 MPC -->
+    </include>
+
+    <!-- IK is started by load_kuavo_real_wheel.launch when with_ik:=true.
+         Do not include ik_node.launch again here, otherwise /ik services and
+         /kuavo_arm_traj publishers may be duplicated. -->
+
+    <!-- 加载 kuavo.json 配置参数 -->
+    <arg name="kuavoConfigFile"
+          default="$(find kuavo_assets)/config/kuavo_v$(arg robot_version)/kuavo.json"/>
+    <param name="kuavo_configuration" textfile="$(arg kuavoConfigFile)"/>
+
+    <!-- ========== Vive Bridge 节点 ========== -->
+    <!--      vive_arm_bridge.py 位于:
+       vive_kuavo_bridge/scripts/vive_arm_bridge.py
+
+     注意:
+       - 脚本需要 chmod +x
+       - 当前默认 source_type=udp
+       - calibrate 成功后才开始发布 IK 控制 -->
+    <node pkg="vive_kuavo_bridge"
+          type="vive_arm_bridge.py"
+          name="vive_arm_bridge"
+          output="screen"
+          required="false"
+          if="$(arg start_vive_bridge)">
+
+        <param name="source_type"     value="$(arg source_type)"/>
+        <param name="udp_port"        value="$(arg udp_port)"/>
+        <param name="publish_rate"    value="$(arg publish_rate)"/>
+        <param name="enable_left"     value="$(arg enable_left)"/>
+        <param name="enable_right"    value="$(arg enable_right)"/>
+        <param name="ee_frame_left"   value="$(arg ee_frame_left)"/>
+        <param name="ee_frame_right"  value="$(arg ee_frame_right)"/>
+        <param name="elbow_frame_left" value="l_forearm_pitch"/>
+        <param name="elbow_frame_right" value="r_forearm_pitch"/>
+        <param name="position_scale"  value="$(arg position_scale)"/>
+        <param name="max_delta_pos"   value="$(arg max_delta_pos)"/>
+        <param name="q0_topic"        value="$(arg q0_topic)"/>
+        <param name="q0_topic_type"   value="$(arg q0_topic_type)"/>
+        <param name="q0_arm_start_index" value="$(arg q0_arm_start_index)"/>
+        <param name="q0_units"        value="$(arg q0_units)"/>
+        <param name="require_q0"      value="$(arg require_q0)"/>
+        <param name="q0_wait_timeout" value="$(arg q0_wait_timeout)"/>
+        <param name="min_q0_norm"     value="$(arg min_q0_norm)"/>
+        <param name="max_q0_step"     value="$(arg max_q0_step)"/>
+        <param name="fk_service"      value="$(arg fk_service)"/>
+        <param name="use_position_axis_map" value="$(arg use_position_axis_map)"/>
+        <param name="map_x"           value="$(arg map_x)"/>
+        <param name="map_y"           value="$(arg map_y)"/>
+        <param name="map_z"           value="$(arg map_z)"/>
+        <param name="enable_orientation" value="$(arg enable_orientation)"/>
+        <param name="orientation_scale" value="$(arg orientation_scale)"/>
+        <param name="max_orientation_delta_deg" value="$(arg max_orientation_delta_deg)"/>
+        <param name="rot_map_roll"    value="$(arg rot_map_roll)"/>
+        <param name="rot_map_pitch"   value="$(arg rot_map_pitch)"/>
+        <param name="rot_map_yaw"     value="$(arg rot_map_yaw)"/>
+        <param name="orientation_apply_order" value="$(arg orientation_apply_order)"/>
+        <param name="tracker_timeout" value="$(arg tracker_timeout)"/>
+        <param name="max_tracker_raw_step" value="$(arg max_tracker_raw_step)"/>
+        <param name="max_tracker_target_step" value="$(arg max_tracker_target_step)"/>
+    </node>
+
+</launch>
