@@ -4,7 +4,11 @@
     <arg name="robot_version" default="$(optenv ROBOT_VERSION 40)"/>
     <arg name="ctrl_arm_idx" default="2" />
     <arg name="ik_type_idx" default="0" />
-    <arg name="ip_address" default="" />
+    <arg name="ip_address" default="$(optenv KUAVO_VR_IP 192.168.50.79)" />
+    <arg name="wired_vr_route_mode" default="$(optenv KUAVO_WIRED_VR_ROUTE_MODE auto)" />
+    <arg name="wired_vr_if" default="$(optenv KUAVO_WIRED_VR_IF eno1)" />
+    <arg name="wired_vr_local_ip" default="$(optenv KUAVO_WIRED_VR_LOCAL_IP 192.168.50.80/24)" />
+    <arg name="upper_wired_ip" default="$(optenv KUAVO_UPPER_WIRED_IP 192.168.26.12)" />
     <arg name="control_torso" default="false" /> <!-- false: do NOT control, true: control torso  -->
     <arg name="control_finger_type" default="0" /> <!-- 0: control all fingers by upper-gripper, 1: control thumb and index fingers by upper-gripper, control other fingers by lower-gripper  -->
     <arg name="predict_gesture" default="false" /> <!-- True or False -->
@@ -204,6 +208,7 @@
 
     <!-- noitom_hi5_hand_udp_python -->
     <!-- Python implementation (default) -->
+    <node pkg="noitom_hi5_hand_udp_python" type="setup_wired_vr_route.sh" name="setup_wired_vr_route" args="$(arg wired_vr_route_mode) $(arg ip_address) $(arg wired_vr_if) $(arg wired_vr_local_ip) $(arg upper_wired_ip)" output="screen" required="false" />
     <node pkg="noitom_hi5_hand_udp_python" type="monitor_quest3.py" args="$(arg ip_address)" name="monitor_quest3" output="screen" unless="$(arg use_cpp_monitor)">
         <param name="enable_head_control" value="$(arg enable_head_control)" />
     </node>

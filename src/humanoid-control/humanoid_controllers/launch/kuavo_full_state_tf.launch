@@ -1,0 +1,23 @@
+<launch>
+  <!-- State-only TF helper for Kuavo v62/full robot_description.
+       It does not publish robot commands. -->
+  <arg name="input_topic" default="/sensors_data_raw" />
+  <arg name="joint_states_topic" default="/joint_states" />
+  <arg name="publish_frequency" default="100.0" />
+
+  <node pkg="humanoid_controllers"
+        type="sensors_data_to_joint_states.py"
+        name="kuavo_sensors_to_joint_states"
+        output="screen">
+    <param name="input_topic" value="$(arg input_topic)" />
+    <param name="output_topic" value="$(arg joint_states_topic)" />
+  </node>
+
+  <node pkg="robot_state_publisher"
+        type="robot_state_publisher"
+        name="kuavo_full_robot_state_publisher"
+        output="screen">
+    <param name="publish_frequency" value="$(arg publish_frequency)" />
+    <remap from="joint_states" to="$(arg joint_states_topic)" />
+  </node>
+</launch>

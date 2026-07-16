@@ -51,6 +51,7 @@
     <arg name="start_way"          default="manual"/>
     <arg name="use_estimator_contact"   default="false"/>
     <arg name="visualize_humanoid" default="true"/>
+    <arg name="publish_full_state_tf" default="false"/>
     <arg name="ruiwo_cxx_sdk" default="true"/>
     <!-- 根据机器人类型设置only_half_up_body参数 -->
     <arg name="only_half_up_body" default="false" if="$(eval arg('robot_type') == 1)"/>    <!-- 轮臂机器人 -->
@@ -114,6 +115,12 @@
     <param name="gaitCommandFile"  value="$(find humanoid_controllers)/config/kuavo_v45/command/gait.info"/>
     <param name="referenceFile"    value="$(find humanoid_controllers)/config/kuavo_v45/command/reference.info"/>
     <param name="robot_description" textfile="$(arg urdfFile)"/>
+
+    <!-- Optional full robot TF for EEF-state inference/deployment.
+         State-only: /sensors_data_raw -> /joint_states -> robot_state_publisher. -->
+    <group if="$(arg publish_full_state_tf)">
+      <include file="$(find humanoid_controllers)/launch/kuavo_full_state_tf.launch"/>
+    </group>
 
     <!-- Launch script to collect kuavo-launch information -->
     <node pkg="humanoid_controllers" type="collect_launch_info.sh" name="collect_launch_info" />

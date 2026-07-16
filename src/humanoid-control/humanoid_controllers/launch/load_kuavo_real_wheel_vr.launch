@@ -6,9 +6,13 @@
     <arg name="ctrl_arm_idx" default="2"/>
     <arg name="predict_gesture" default="false"/>
     <arg name="ee_type" default="qiangnao"/>
-    <arg name="enable_head_control" default="true"/>
+    <arg name="enable_head_control" default="false"/>
     <arg name="use_vr_control" default="true"/>
-    <arg name="ip_address" default=""/>
+    <arg name="ip_address" default="$(optenv KUAVO_VR_IP 192.168.50.79)"/>
+    <arg name="wired_vr_route_mode" default="$(optenv KUAVO_WIRED_VR_ROUTE_MODE auto)"/>
+    <arg name="wired_vr_if" default="$(optenv KUAVO_WIRED_VR_IF eno1)"/>
+    <arg name="wired_vr_local_ip" default="$(optenv KUAVO_WIRED_VR_LOCAL_IP 192.168.50.80/24)"/>
+    <arg name="upper_wired_ip" default="$(optenv KUAVO_UPPER_WIRED_IP 192.168.26.12)"/>
     
     <!-- 增量VR遥操作控制相关参数 -->
     <arg name="use_cpp_incremental_ik" default="false"/>
@@ -32,8 +36,12 @@
       <arg name="ctrl_arm_idx" value="$(arg ctrl_arm_idx)"/>
       <arg name="predict_gesture" value="$(arg predict_gesture)"/>
       <arg name="ee_type" default="$(arg ee_type)"/>
-      <arg name="enable_head_control" value="true"/>
+      <arg name="enable_head_control" value="$(arg enable_head_control)"/>
       <arg name="ip_address" value="$(arg ip_address)"/>
+      <arg name="wired_vr_route_mode" value="$(arg wired_vr_route_mode)"/>
+      <arg name="wired_vr_if" value="$(arg wired_vr_if)"/>
+      <arg name="wired_vr_local_ip" value="$(arg wired_vr_local_ip)"/>
+      <arg name="upper_wired_ip" value="$(arg upper_wired_ip)"/>
       <arg name="use_cpp_incremental_ik" value="$(arg use_cpp_incremental_ik)"/>
       <arg name="use_incremental_hand_orientation" value="$(arg use_incremental_hand_orientation)"/>
       <arg name="wheel_ik" value="$(arg wheel_ik)"/>
