@@ -1,0 +1,1007 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+vive_arm_bridge.py — Vive Ultimate Tracker → IK Pipeline 桥接节点
+
+功能:
+  1. 读取 Vive Tracker 的 6DoF 位姿 (SteamVR/OpenVR 或 UDP 转发)
+  2. 手动触发标定 → 增量映射到机器人末端
+  3. 持续发布 kuavo_msgs/twoArmHandPoseCmd 到 /ik/two_arm_hand_pose_cmd
+  4. 不干预 /kuavo_arm_traj 及下游
+
+策略: 右臂优先、左臂冻结、先位置后姿态
+
+标定流程 (手动触发):
+
+  Phase 0 (INIT):
+    - 初始化节点, 打开数据源, 发现 Tracker
+    - 等待所有启用的手部 Tracker 在线
+
+  Phase 1 (WAIT_CALIB):
+    - 等待用户调用校准服务 /vive_arm_bridge/calibrate
+    - 调用时记录 T_tracker0, 并读取左右手当前 TF
+
+  Phase 2 (PRE_ACTIVE):
+    - 调用 /change_arm_ctrl_mode (mode=2) 切换到外部控制
+
+  Phase 3 (ACTIVE):
+    - 持续发布 /ik/two_arm_hand_pose_cmd
+    - 只控右臂时左臂发布冻结姿态
+
+  增量映射:
+    dT          = inv(T_tracker0) × T_tracker_now      (缩放后)
+    T_target    = T_robot_ee0 × dT                     (位置限幅后)
+    姿态冻结为 T_robot_ee0 的姿态
+
+启动方式:
+  roslaunch vive/load_kuavo_real_wheel_vive.launch
+
+ROS 参数:
+  ~source_type          : 数据源 "openvr" / "udp" / "mock" (默认 openvr)
+  ~tracker_right_serial : 右手 Tracker 序列号 (可自动发现)
+  ~publish_rate         : 发布频率 Hz (默认 100)
+  ~enable_left          : 启用左手 (默认 false, 右臂优先)
+  ~enable_right         : 启用右手 (默认 true)
+  ~udp_port             : UDP 监听端口 (source_type=udp 时, 默认 11051)
+  ~ee_frame_right       : 右手末端 TF frame (默认 zarm_r7_end_effector)
+  ~ee_frame_left        : 左手末端 TF frame (默认 zarm_l7_end_effector)
+  ~position_scale       : 手部位移缩放系数 (默认 0.3)
+  ~max_delta_pos        : 最大位移限制 米 (默认 0.10)
+
+ROS 服务:
+  /vive_arm_bridge/calibrate (std_srvs/Trigger)
+    调用后记录当前 Tracker+机器人位姿作为标定基准, 然后切臂模式, 开始发布 IK
+
+依赖:
+  pip install openvr    (source_type=openvr 时需要)
+"""
+
+import sys
+import math
+import json
+import threading
+import time
+from abc import ABC, abstractmethod
+from enum import IntEnum
+from typing import Dict, Optional, Tuple
+
+import numpy as np
+
+import rospy
+import tf
+
+# tf.transformations 约定: 所有四元数均为 xyzw 顺序
+#   quaternion_matrix([x,y,z,w])   → 4x4 矩阵
+#   quaternion_from_matrix(T)      → [x,y,z,w]
+#   lookupTransform 返回 (trans, rot) rot 为 [x,y,z,w]
+from tf.transformations import quaternion_from_matrix, quaternion_matrix
+
+from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
+from kuavo_msgs.msg import sensorsData, twoArmHandPoseCmd, twoArmHandPose, armHandPose
+from kuavo_msgs.srv import fkSrv
+
+
+
+# 只在需要时 import
+# from kuavo_msgs.srv import changeArmCtrlMode
+
+
+# =========================================================================
+# 数据结构
+# =========================================================================
+
+class ArmQ0Provider:
+    def __init__(self, log_prefix):
+        self.log_prefix = log_prefix
+        self.topic = rospy.get_param("~q0_topic", "/sensors_data_raw")
+        self.topic_type = str(rospy.get_param("~q0_topic_type", "sensors_data")).lower()
+        default_start = int(rospy.get_param("/legRealDof", 4)) + int(rospy.get_param("/waistRealDof", 0))
+        self.arm_start_index = int(rospy.get_param("~q0_arm_start_index", default_start))
+        self.q0_units = str(rospy.get_param("~q0_units", "rad")).lower()
+        self.allow_zero_q0 = bool(rospy.get_param("~allow_zero_q0", False))
+        self.min_q0_norm = float(rospy.get_param("~min_q0_norm", 0.5))
+        self.max_q0_step = float(rospy.get_param("~max_q0_step", 0.5))
+        self.require_q0 = bool(rospy.get_param("~require_q0", True))
+        self.left_q = None
+        self.right_q = None
+        self.last_stamp = None
+
+        if self.topic_type == "sensors_data":
+            rospy.Subscriber(self.topic, sensorsData, self._sensors_data_cb, queue_size=1)
+        elif self.topic_type == "joint_state":
+            rospy.Subscriber(self.topic, JointState, self._joint_state_cb, queue_size=1)
+        elif self.topic_type == "float64_multi_array":
+            rospy.Subscriber(self.topic, Float64MultiArray, self._array_cb, queue_size=1)
+        else:
+            raise ValueError("unsupported q0_topic_type: %s" % self.topic_type)
+
+        rospy.loginfo("[%s] q0 source topic=%s type=%s arm_start=%d units=%s require=%s",
+                      self.log_prefix, self.topic, self.topic_type,
+                      self.arm_start_index, self.q0_units, self.require_q0)
+
+    def _convert_units(self, values):
+        arr = np.asarray(values, dtype=np.float64)
+        if self.q0_units == "deg":
+            arr = np.deg2rad(arr)
+        return arr
+
+    def _accept(self, left, right):
+        q = np.concatenate([left, right])
+        q_norm = float(np.linalg.norm(q))
+        if not self.allow_zero_q0 and q_norm < self.min_q0_norm:
+            rospy.logwarn_throttle(
+                2.0, "[%s] q0 rejected: norm %.6f < min_q0_norm %.6f",
+                self.log_prefix, q_norm, self.min_q0_norm)
+            return
+        if self.has_q0() and self.max_q0_step > 0.0:
+            prev = np.concatenate([self.left_q, self.right_q])
+            max_step = float(np.max(np.abs(q - prev)))
+            if max_step > self.max_q0_step:
+                rospy.logwarn_throttle(
+                    2.0, "[%s] q0 rejected: max step %.6f rad > %.6f rad",
+                    self.log_prefix, max_step, self.max_q0_step)
+                return
+        if (not self.allow_zero_q0 and
+                np.linalg.norm(left) < 1e-8 and np.linalg.norm(right) < 1e-8):
+            rospy.logwarn_throttle(2.0, "[%s] q0 rejected: left/right joint_angles are all zero", self.log_prefix)
+            return
+        self.left_q = left
+        self.right_q = right
+        self.last_stamp = rospy.Time.now()
+
+    def _accept_joint_array(self, data):
+        if len(data) < self.arm_start_index + 14:
+            rospy.logwarn_throttle(
+                2.0, "[%s] q0 topic %s length=%d, need at least %d",
+                self.log_prefix, self.topic, len(data), self.arm_start_index + 14)
+            return
+        start = self.arm_start_index
+        q = self._convert_units(data[start:start + 14])
+        self._accept(q[:7], q[7:14])
+
+    def _sensors_data_cb(self, msg):
+        self._accept_joint_array(list(msg.joint_data.joint_q))
+
+    def _array_cb(self, msg):
+        self._accept_joint_array(list(msg.data))
+
+    def _joint_state_cb(self, msg):
+        self._accept_joint_array(list(msg.position))
+
+    def has_q0(self):
+        return self.left_q is not None and self.right_q is not None
+
+    def wait_for_q0(self, timeout):
+        deadline = time.time() + float(timeout)
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown() and time.time() < deadline:
+            if self.has_q0():
+                return True
+            rospy.logwarn_throttle(2.0, "[%s] waiting for valid q0 from %s",
+                                   self.log_prefix, self.topic)
+            rate.sleep()
+        return self.has_q0()
+
+    def q_arm(self):
+        if not self.has_q0():
+            return None
+        return np.concatenate([self.left_q, self.right_q])
+
+    def apply_to_cmd(self, cmd):
+        if not self.has_q0():
+            if self.require_q0:
+                rospy.logwarn_throttle(2.0, "[%s] waiting for valid q0 from %s; IK cmd not published",
+                                       self.log_prefix, self.topic)
+            return not self.require_q0
+        cmd.joint_angles_as_q0 = True
+        cmd.hand_poses.left_pose.joint_angles = [float(x) for x in self.left_q]
+        cmd.hand_poses.right_pose.joint_angles = [float(x) for x in self.right_q]
+        return True
+
+
+class TrackerPose:
+    __slots__ = ('position', 'rotation', 'quaternion', 'valid', 'timestamp')
+
+    def __init__(self, position=None, rotation=None, quaternion=None,
+                 valid=True, timestamp=0.0):
+        self.position = position if position is not None else np.zeros(3)
+        self.rotation = rotation if rotation is not None else np.eye(3)
+        # quaternion 统一为 xyzw
+        self.quaternion = quaternion if quaternion is not None else np.array([0., 0., 0., 1.])
+        self.valid = valid
+        self.timestamp = timestamp
+
+
+
+class Phase(IntEnum):
+    INIT = 0
+    WAIT_CALIB = 1
+    PRE_ACTIVE = 2
+    ACTIVE = 3
+
+
+# =========================================================================
+# 数学工具 ———— 四元数全部 xyzw
+# =========================================================================
+
+def _mat_from_pos_quat(pos: np.ndarray, quat_xyzw: np.ndarray) -> np.ndarray:
+    """位置 + xyzw 四元数 → 4x4 齐次矩阵"""
+    T = quaternion_matrix(quat_xyzw)          # quaternion_matrix 接收 xyzw
+    T[0, 3] = pos[0]
+    T[1, 3] = pos[1]
+    T[2, 3] = pos[2]
+    return T
+
+
+def _pos_quat_from_mat(T: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """4x4 齐次矩阵 → (pos, quat_xyzw)"""
+    pos = T[:3, 3].copy()
+    quat = quaternion_from_matrix(T)           # 返回 xyzw
+    return pos, np.asarray(quat, dtype=np.float64)
+
+
+def _rotmat_to_quat_xyzw(m33) -> np.ndarray:
+    """3x3 旋转矩阵 → 四元数 xyzw"""
+    m = np.asarray(m33, dtype=np.float64)
+    q = np.zeros(4)
+    t = np.trace(m)
+    if t > 0:
+        s = math.sqrt(t + 1.0) * 2.0
+        q[3] = 0.25 * s
+        q[0] = (m[2, 1] - m[1, 2]) / s
+        q[1] = (m[0, 2] - m[2, 0]) / s
+        q[2] = (m[1, 0] - m[0, 1]) / s
+    elif m[0, 0] > m[1, 1] and m[0, 0] > m[2, 2]:
+        s = math.sqrt(1.0 + m[0, 0] - m[1, 1] - m[2, 2]) * 2.0
+        q[3] = (m[2, 1] - m[1, 2]) / s
+        q[0] = 0.25 * s
+        q[1] = (m[0, 1] + m[1, 0]) / s
+        q[2] = (m[0, 2] + m[2, 0]) / s
+    elif m[1, 1] > m[2, 2]:
+        s = math.sqrt(1.0 + m[1, 1] - m[0, 0] - m[2, 2]) * 2.0
+        q[3] = (m[0, 2] - m[2, 0]) / s
+        q[0] = (m[0, 1] + m[1, 0]) / s
+        q[1] = 0.25 * s
+        q[2] = (m[1, 2] + m[2, 1]) / s
+    else:
+        s = math.sqrt(1.0 + m[2, 2] - m[0, 0] - m[1, 1]) * 2.0
+        q[3] = (m[1, 0] - m[0, 1]) / s
+        q[0] = (m[0, 2] + m[2, 0]) / s
+        q[1] = (m[1, 2] + m[2, 1]) / s
+        q[2] = 0.25 * s
+    q /= np.linalg.norm(q)
+    return q
+
+
+def _clamp_vector_length(v: np.ndarray, max_norm: float) -> np.ndarray:
+    """向量缩放, 保证范数不超过 max_norm"""
+    n = np.linalg.norm(v)
+    if n > max_norm and n > 1e-12:
+        return v * (max_norm / n)
+    return v.copy()
+
+
+# =========================================================================
+# Tracker 数据源接口
+# =========================================================================
+
+class TrackerSource(ABC):
+
+    @abstractmethod
+    def initialize(self) -> bool: ...
+
+    @abstractmethod
+    def get_poses(self) -> Dict[str, TrackerPose]: ...
+
+    @abstractmethod
+    def shutdown(self) -> None: ...
+
+
+# =========================================================================
+# OpenVR / SteamVR 数据源
+# =========================================================================
+
+class OpenVRTrackerSource(TrackerSource):
+
+    def __init__(self):
+        self.vr_system = None
+        self._device_serials: Dict[int, str] = {}
+        self._pose_cache: Dict[str, TrackerPose] = {}
+
+    def initialize(self) -> bool:
+        try:
+            import openvr
+        except ImportError:
+            rospy.logerr("[vive_bridge] openvr 未安装: pip install openvr")
+            return False
+
+        try:
+            openvr.init(openvr.VRApplication_Background)
+            self.vr_system = openvr.VRSystem()
+            rospy.loginfo("[vive_bridge] OpenVR 初始化成功")
+        except Exception as e:
+            rospy.logerr("[vive_bridge] OpenVR 初始化失败: %s", e)
+            return False
+
+        for i in range(openvr.k_unMaxTrackedDeviceCount):
+            cls = self.vr_system.getTrackedDeviceClass(i)
+            if cls == openvr.TrackedDeviceClass_GenericTracker:
+                s = self.vr_system.getStringTrackedDeviceProperty(i, openvr.Prop_SerialNumber_String)
+                self._device_serials[i] = s
+                rospy.loginfo("[vive_bridge] 发现 Tracker: idx=%d serial=%s", i, s)
+
+        return True
+
+    def get_poses(self) -> Dict[str, TrackerPose]:
+        import openvr
+        poses_t = openvr.TrackedDevicePose_t * openvr.k_unMaxTrackedDeviceCount
+        poses = self.vr_system.getDeviceToAbsoluteTrackingPose(
+            openvr.TrackingUniverseStanding, 0.0, poses_t, openvr.k_unMaxTrackedDeviceCount)
+
+        for idx, serial in self._device_serials.items():
+            p = poses[idx]
+            if p.bPoseIsValid and p.bDeviceIsConnected:
+                m = p.mDeviceToAbsoluteTracking
+                rot = np.array([[m[0][0], m[0][1], m[0][2]],
+                                [m[1][0], m[1][1], m[1][2]],
+                                [m[2][0], m[2][1], m[2][2]]], dtype=np.float64)
+                pos = np.array([m[0][3], m[1][3], m[2][3]], dtype=np.float64)
+                self._pose_cache[serial] = TrackerPose(
+                    position=pos, rotation=rot,
+                    quaternion=_rotmat_to_quat_xyzw(rot),  # xyzw
+                    valid=True, timestamp=rospy.Time.now().to_sec(),
+                )
+            else:
+                if serial in self._pose_cache:
+                    self._pose_cache[serial].valid = False
+        return self._pose_cache
+
+    def shutdown(self):
+        try:
+            import openvr
+            openvr.shutdown()
+        except Exception:
+            pass
+
+
+# =========================================================================
+# UDP 数据源
+# =========================================================================
+
+class UDPTrackerSource(TrackerSource):
+
+    def __init__(self, port=11051):
+        self.port = port
+        self.sock = None
+        self._pose_cache: Dict[str, TrackerPose] = {}
+        self._thread: Optional[threading.Thread] = None
+        self._running = False
+
+    def initialize(self) -> bool:
+        import socket
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            self.sock.bind(('0.0.0.0', self.port))
+            self.sock.settimeout(0.5)
+        except OSError as e:
+            rospy.logerr("[vive_bridge] UDP 端口 %d 绑定失败: %s", self.port, e)
+            return False
+
+        self._running = True
+        self._thread = threading.Thread(target=self._recv_loop, daemon=True)
+        self._thread.start()
+        rospy.loginfo("[vive_bridge] UDP 监听端口 %d", self.port)
+        return True
+
+    def _recv_loop(self):
+        buf = b""
+        while self._running and not rospy.is_shutdown():
+            try:
+                data, _ = self.sock.recvfrom(65536)
+                buf += data
+                while b'\n' in buf:
+                    line, buf = buf.split(b'\n', 1)
+                    try:
+                        obj = json.loads(line.decode('utf-8').strip())
+                        s = obj["serial"]
+                        pos = np.array([obj["x"], obj["y"], obj["z"]], dtype=np.float64)
+                        # JSON 里 qx/qy/qz/qw → xyzw 数组, 直接传入 quaternion_matrix
+                        quat = np.array([obj["qx"], obj["qy"], obj["qz"], obj["qw"]], dtype=np.float64)
+                        rot = quaternion_matrix(quat)[:3, :3]    # quaternion_matrix 接收 xyzw
+                        self._pose_cache[s] = TrackerPose(
+                            position=pos, rotation=rot, quaternion=quat,
+                            valid=True, timestamp=rospy.Time.now().to_sec(),
+                        )
+                    except (json.JSONDecodeError, KeyError):
+                        rospy.logwarn_throttle(5.0, "[vive_bridge] 无效 UDP: %s", line[:80])
+            except OSError:
+                continue
+            except Exception as e:
+                rospy.logerr("[vive_bridge] UDP 异常: %s", e)
+
+    def get_poses(self) -> Dict[str, TrackerPose]:
+        return dict(self._pose_cache)
+
+    def shutdown(self):
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=1.0)
+        if self.sock:
+            self.sock.close()
+
+
+# =========================================================================
+# Mock 数据源 (测试用)
+# =========================================================================
+
+class MockTrackerSource(TrackerSource):
+
+    def __init__(self):
+        self._t = 0.0
+        self._pose_cache: Dict[str, TrackerPose] = {}
+
+    def initialize(self) -> bool:
+        rospy.loginfo("[vive_bridge] MockTrackerSource")
+        self._pose_cache["MOCK_RIGHT"] = TrackerPose(
+            position=np.array([0.0, -0.3, 0.7]),
+            quaternion=np.array([0., 0., 0., 1.]),
+        )
+        return True
+
+    def get_poses(self) -> Dict[str, TrackerPose]:
+        self._t += 0.01
+        for s in self._pose_cache:
+            self._pose_cache[s].valid = True
+        return dict(self._pose_cache)
+
+    def shutdown(self):
+        pass
+
+
+# =========================================================================
+# 主桥接节点
+# =========================================================================
+
+class ViveArmBridge:
+    """
+    dT = scale * inv(T_tracker0) × T_now   (缩放 + 限幅)
+    T_target = T_robot_ee0 × dT             (位置限幅后)
+    姿态冻结为 T_robot_ee0
+    """
+
+    def __init__(self):
+        rospy.init_node('vive_arm_bridge', anonymous=True)
+
+        # ── 参数 ──────────────────────────────────────────
+        self.enable_left  = rospy.get_param("~enable_left", False)
+        self.enable_right = rospy.get_param("~enable_right", True)
+        self.tracker_right_serial = rospy.get_param("~tracker_right_serial", "")
+        self.tracker_left_serial  = rospy.get_param("~tracker_left_serial", "")
+        self.publish_rate = rospy.get_param("~publish_rate", 30.0)
+        source_type       = rospy.get_param("~source_type", "openvr")
+        udp_port          = rospy.get_param("~udp_port", 11051)
+        self.ee_frame_right = rospy.get_param("~ee_frame_right", "zarm_r7_end_effector")
+        self.ee_frame_left  = rospy.get_param("~ee_frame_left", "zarm_l7_end_effector")
+        self.elbow_frame_right = rospy.get_param("~elbow_frame_right", "r_forearm_pitch")
+        self.elbow_frame_left  = rospy.get_param("~elbow_frame_left", "l_forearm_pitch")
+        self.position_scale = rospy.get_param("~position_scale", 0.2)
+        self.max_delta_pos  = rospy.get_param("~max_delta_pos", 0.05)
+        self.fk_service_name = rospy.get_param("~fk_service", "/ik/fk_srv")
+        self.q0_wait_timeout = float(rospy.get_param("~q0_wait_timeout", 10.0))
+        
+
+        rospy.loginfo("[vive_bridge] enable_left=%s  enable_right=%s  scale=%.2f  max_delta=%.3f m",
+                      self.enable_left, self.enable_right, self.position_scale, self.max_delta_pos)
+
+        # ── 数据源 ────────────────────────────────────────
+        source_map = {
+            "openvr": OpenVRTrackerSource,
+            "udp":    UDPTrackerSource,
+            "mock":   MockTrackerSource,
+        }
+        if source_type == "udp":
+            self.tracker_source: TrackerSource = UDPTrackerSource(port=udp_port)
+        elif source_type in source_map:
+            self.tracker_source = source_map[source_type]()
+        else:
+            rospy.logerr("[vive_bridge] 未知 source_type: %s", source_type)
+            sys.exit(1)
+
+        if not self.tracker_source.initialize():
+            rospy.logerr("[vive_bridge] 数据源初始化失败")
+            sys.exit(1)
+
+        # ── TF ────────────────────────────────────────────
+        self.tf_listener = tf.TransformListener()
+        self.tf_broadcaster = tf.TransformBroadcaster()
+        self.q0_provider = ArmQ0Provider("vive_bridge")
+
+        # ── 序列号 ────────────────────────────────────────
+        self._serial_right = self.tracker_right_serial
+        self._serial_left = self.tracker_left_serial
+
+        # ── 标定数据 ──────────────────────────────────────
+        self._T_tracker0: Dict[str, Optional[np.ndarray]] = {"left": None, "right": None}
+        self._T_robot_ee0: Dict[str, Optional[np.ndarray]] = {"left": None, "right": None}
+        # 冻结姿态 (xyzw), 左右手各一份
+        self._robot_ee0_quat: Dict[str, Optional[np.ndarray]] = {"left": None, "right": None}
+        # elbow_pos_xyz is an optional weak hint. If TF is unavailable, keep it zero
+        # to disable elbow hint per the official IK documentation.
+        self._robot_elbow0_pos: Dict[str, Optional[np.ndarray]] = {"left": None, "right": None}
+        self._calibrated: Dict[str, bool] = {"left": False, "right": False}
+
+        # ── 当前目标 ──────────────────────────────────────
+        self._target_right_pos = np.zeros(3)
+        self._target_left_pos = np.zeros(3)
+        self._has_target_right = False
+        self._has_target_left = False
+
+        # ── 状态机 ────────────────────────────────────────
+        self._phase = Phase.INIT
+
+        # ── ROS 接口 ──────────────────────────────────────
+        self.cmd_pub = rospy.Publisher(
+            '/ik/two_arm_hand_pose_cmd', twoArmHandPoseCmd, queue_size=2)
+        self.viz_right_pub = rospy.Publisher('~viz/right_hand', PoseStamped, queue_size=10)
+        self.viz_left_pub  = rospy.Publisher('~viz/left_hand', PoseStamped, queue_size=10)
+        self.publish_raw_pose = rospy.get_param("~publish_raw_pose", True)
+        self.raw_right_pub = rospy.Publisher(
+            '~raw/right_tracker_pose', PoseStamped, queue_size=10)
+        self.raw_left_pub = rospy.Publisher(
+            '~raw/left_tracker_pose', PoseStamped, queue_size=10)
+
+        import std_srvs.srv
+        self._calib_srv = rospy.Service(
+            '/vive_arm_bridge/calibrate', std_srvs.srv.Trigger, self._handle_calibrate)
+
+        rospy.loginfo("[vive_bridge] 初始化完成  phase=INIT  source=%s  rate=%.0f Hz",
+                      source_type, self.publish_rate)
+        rospy.loginfo("[vive_bridge] 等待 Tracker 就绪后, 调用 rosservice call /vive_arm_bridge/calibrate")
+
+    # ── 序列号检查 ────────────────────────────────────────
+
+    def _check_serials_confirmed(self) -> bool:
+        ok_left = (not self.enable_left) or bool(self._serial_left)
+        ok_right = (not self.enable_right) or bool(self._serial_right)
+        return ok_left and ok_right
+
+    # ── 臂模式切换 ────────────────────────────────────────
+
+    def _ensure_arm_external_control(self) -> bool:
+        from kuavo_msgs.srv import changeArmCtrlMode
+        try:
+            rospy.wait_for_service('/change_arm_ctrl_mode', timeout=10.0)
+            srv = rospy.ServiceProxy('/change_arm_ctrl_mode', changeArmCtrlMode)
+            resp = srv(control_mode=2)
+            rospy.loginfo("[vive_bridge] 臂模式 → external control: result=%s mode=%d msg=%s",
+                          resp.result, resp.mode, resp.message)
+            return resp.result
+        except rospy.ROSException as e:
+            rospy.logerr("[vive_bridge] /change_arm_ctrl_mode 失败: %s", e)
+            return False
+
+    def _get_robot_frame_pos(self, frame_name: str, side: str) -> Optional[np.ndarray]:
+        T = self._get_robot_ee_pose(frame_name, side)
+        if T is None:
+            return None
+        return T[:3, 3].copy()
+
+    def _record_elbow_freeze(self, side: str, elbow_frame: str) -> bool:
+        self._robot_elbow0_pos[side] = np.zeros(3, dtype=np.float64)
+        rospy.loginfo("[vive_bridge] %s elbow hint disabled", side)
+        return True
+
+    # ── 从 IK FK 服务读取机器人当前末端位姿 ─────────────────
+
+    def _get_robot_ee_pose(self, frame_name: str, side: str) -> Optional[np.ndarray]:
+        """返回 4x4 齐次矩阵, 或 None"""
+        try:
+            if side not in ("left", "right"):
+                rospy.logwarn("[vive_bridge] unsupported FK side: %s", side)
+                return None
+            if not self.q0_provider.wait_for_q0(self.q0_wait_timeout):
+                rospy.logwarn("[vive_bridge] no valid q0 from %s", self.q0_provider.topic)
+                return None
+            rospy.wait_for_service(self.fk_service_name, timeout=10.0)
+            fk_client = rospy.ServiceProxy(self.fk_service_name, fkSrv)
+            result = fk_client(self.q0_provider.q_arm().tolist())
+            if not result.success:
+                rospy.logwarn("[vive_bridge] %s failed for current q0", self.fk_service_name)
+                return None
+            pose = result.hand_poses.left_pose if side == "left" else result.hand_poses.right_pose
+            pos = np.asarray(pose.pos_xyz, dtype=np.float64)
+            quat = np.asarray(pose.quat_xyzw, dtype=np.float64)
+            return _mat_from_pos_quat(pos, quat)
+        except Exception as e:
+            rospy.logwarn_throttle(2.0, "[vive_bridge] FK %s (%s): %s", side, frame_name, str(e)[:80])
+            return None
+
+    # ── 校准服务回调 ──────────────────────────────────────
+
+    def _record_hand_calib(self, side: str, serial: str, ee_frame: str,
+                            poses: Dict[str, TrackerPose]) -> Optional[str]:
+        """记录单手标定, 返回错误信息或 None(成功)"""
+        tp = poses.get(serial)
+        if not (tp and tp.valid):
+            return "Tracker 数据无效"
+        self._T_tracker0[side] = _mat_from_pos_quat(tp.position, tp.quaternion)
+
+        T_ee0 = self._get_robot_ee_pose(ee_frame, side)
+        if T_ee0 is None:
+            self._T_tracker0[side] = None
+            return "无法读取末端 FK"
+        self._T_robot_ee0[side] = T_ee0
+        # 冻结姿态 (xyzw)
+        _, quat_frozen = _pos_quat_from_mat(T_ee0)
+        self._robot_ee0_quat[side] = quat_frozen
+        elbow_frame = self.elbow_frame_left if side == "left" else self.elbow_frame_right
+        self._record_elbow_freeze(side, elbow_frame)
+        pos, _ = _pos_quat_from_mat(T_ee0)
+        return None  # ok
+
+    def _handle_calibrate(self, req):
+        """ /vive_arm_bridge/calibrate (Trigger) """
+        if self._phase == Phase.ACTIVE:
+            return (False, "已经在 ACTIVE 状态")
+        if self._phase != Phase.WAIT_CALIB:
+            return (False, "当前状态 %s, 请等待 Tracker 就绪" % self._phase.name)
+
+        poses = self.tracker_source.get_poses()
+        ok = True
+        msgs = []
+
+        # ── 右手 (如果启用) ─────────────────────────────────
+        if self.enable_right:
+            err = self._record_hand_calib("right", self._serial_right,
+                                          self.ee_frame_right, poses)
+            if err:
+                ok = False
+                msgs.append("右手: " + err)
+            else:
+                pos, _ = _pos_quat_from_mat(self._T_robot_ee0["right"])
+                msgs.append("右手 ok ee0=[%.3f,%.3f,%.3f]" % (pos[0], pos[1], pos[2]))
+                self._calibrated["right"] = True
+
+        # ── 左手 ───────────────────────────────────────────
+        # 即使 enable_left=False, 也读取左臂当前 TF 用于冻结发布
+        if self.enable_left:
+            err = self._record_hand_calib("left", self._serial_left,
+                                          self.ee_frame_left, poses)
+            if err:
+                ok = False
+                msgs.append("左手: " + err)
+            else:
+                pos, _ = _pos_quat_from_mat(self._T_robot_ee0["left"])
+                msgs.append("左手 ok ee0=[%.3f,%.3f,%.3f]" % (pos[0], pos[1], pos[2]))
+                self._calibrated["left"] = True
+        else:
+            # 只控右臂时, 左臂也要读取当前位姿用于冻结
+            T_ee0_left = self._get_robot_ee_pose(self.ee_frame_left, "left")
+            if T_ee0_left is not None:
+                self._T_robot_ee0["left"] = T_ee0_left
+                _, quat_frozen = _pos_quat_from_mat(T_ee0_left)
+                self._robot_ee0_quat["left"] = quat_frozen
+                self._record_elbow_freeze("left", self.elbow_frame_left)
+                self._calibrated["left"] = True
+                pos, _ = _pos_quat_from_mat(T_ee0_left)
+                msgs.append("左臂冻结 ok ee0=[%.3f,%.3f,%.3f]" % (pos[0], pos[1], pos[2]))
+            else:
+                ok = False
+                msgs.append("左臂冻结 FK 读取失败")
+
+        if not ok:
+            self._phase = Phase.WAIT_CALIB
+            return (False, "; ".join(msgs))
+
+        rospy.loginfo("[vive_bridge] ✅ 标定: %s", "; ".join(msgs))
+
+        # 切臂模式
+        self._phase = Phase.PRE_ACTIVE
+        if self._ensure_arm_external_control():
+            self._phase = Phase.ACTIVE
+            rospy.loginfo("[vive_bridge] 🟢 进入 ACTIVE")
+        else:
+            self._phase = Phase.WAIT_CALIB
+            return (False, "臂模式切换失败, 请重试")
+
+        return (True, "; ".join(msgs))
+
+    # ── 核心: 增量位置计算 (缩放 + 限幅) ──────────────────
+
+    def _compute_target(self, side: str, T_tracker_now: np.ndarray
+                        ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """
+        dT = scale * inv(T_tracker0) × T_now
+        T_target = T_robot_ee0 × dT
+        位置限幅到 max_delta_pos, 姿态冻结
+        返回 (pos, quat_xyzw) 或 None
+        """
+        T0 = self._T_tracker0[side]
+        Tee0 = self._T_robot_ee0[side]
+        quat0 = self._robot_ee0_quat[side]
+        if T0 is None or Tee0 is None or quat0 is None:
+            return None
+
+        # dT = inv(T0) × T_now
+        dT = np.linalg.inv(T0) @ T_tracker_now
+
+        # 缩放位移
+        dT[0, 3] *= self.position_scale
+        dT[1, 3] *= self.position_scale
+        dT[2, 3] *= self.position_scale
+
+        # T_target = Tee0 × dT
+        T_target = Tee0 @ dT
+
+        # 计算位移向量, 限幅
+        delta_pos = T_target[:3, 3] - Tee0[:3, 3]
+        delta_pos = _clamp_vector_length(delta_pos, self.max_delta_pos)
+
+        pos_target = Tee0[:3, 3] + delta_pos
+
+        return pos_target, quat0.copy()  # 姿态冻结
+
+    def _update_targets(self, poses: Dict[str, TrackerPose]):
+        # 右臂
+        if self.enable_right and self._calibrated["right"]:
+            tp = poses.get(self._serial_right)
+            if tp and tp.valid:
+                T_now = _mat_from_pos_quat(tp.position, tp.quaternion)
+                result = self._compute_target("right", T_now)
+                if result is not None:
+                    self._target_right_pos, _ = result
+                    self._has_target_right = True
+                else:
+                    self._has_target_right = False
+            else:
+                self._has_target_right = False
+
+        # 左臂
+        if self.enable_left and self._calibrated["left"]:
+            tp = poses.get(self._serial_left)
+            if tp and tp.valid:
+                T_now = _mat_from_pos_quat(tp.position, tp.quaternion)
+                result = self._compute_target("left", T_now)
+                if result is not None:
+                    self._target_left_pos, _ = result
+                    self._has_target_left = True
+                else:
+                    self._has_target_left = False
+            else:
+                self._has_target_left = False
+
+    # ── 发布 ──────────────────────────────────────────────
+
+    def _build_and_publish_cmd(self):
+        # ── 硬保护: 未校准不发布 ──────────────────────────
+        if self.enable_right and not self._calibrated.get("right"):
+            return
+        if self._T_robot_ee0.get("right") is None:
+            return
+        if self._T_robot_ee0.get("left") is None:
+            return
+
+        cmd = twoArmHandPoseCmd()
+        cmd.hand_poses = twoArmHandPose()
+        cmd.use_custom_ik_param = False
+        cmd.joint_angles_as_q0 = False
+        cmd.frame = 0  # base_link
+
+        # ── 右臂 ──
+        if self._has_target_right:
+            rp = armHandPose()
+            rp.pos_xyz = [float(self._target_right_pos[0]),
+                          float(self._target_right_pos[1]),
+                          float(self._target_right_pos[2])]
+            rq = self._robot_ee0_quat.get("right")
+            if rq is not None:
+                rp.quat_xyzw = [float(rq[0]), float(rq[1]), float(rq[2]), float(rq[3])]
+            else:
+                rp.quat_xyzw = [0., 0., 0., 1.]
+            rp.elbow_pos_xyz = self._make_elbow_xyz("right")
+            cmd.hand_poses.right_pose = rp
+        elif self._calibrated.get("right"):
+            # 发布冻结位姿
+            self._fill_frozen_pose(cmd, "right")
+
+        # ── 左臂 ──
+        if self._has_target_left:
+            lp = armHandPose()
+            lp.pos_xyz = [float(self._target_left_pos[0]),
+                          float(self._target_left_pos[1]),
+                          float(self._target_left_pos[2])]
+            lq = self._robot_ee0_quat.get("left")
+            if lq is not None:
+                lp.quat_xyzw = [float(lq[0]), float(lq[1]), float(lq[2]), float(lq[3])]
+            else:
+                lp.quat_xyzw = [0., 0., 0., 1.]
+            lp.elbow_pos_xyz = self._make_elbow_xyz("left")
+            cmd.hand_poses.left_pose = lp
+        elif self._calibrated.get("left"):
+            # 左臂冻结
+            self._fill_frozen_pose(cmd, "left")
+
+        if not self.q0_provider.apply_to_cmd(cmd):
+            return
+
+        self.cmd_pub.publish(cmd)
+
+    def _make_elbow_xyz(self, side: str):
+        elbow = self._robot_elbow0_pos.get(side)
+        if elbow is None:
+            elbow = np.zeros(3, dtype=np.float64)
+        return [float(elbow[0]), float(elbow[1]), float(elbow[2])]
+
+    def _fill_frozen_pose(self, cmd, side: str):
+        """填充冻结姿态到 cmd.hand_poses.{side}_pose"""
+        Tee0 = self._T_robot_ee0.get(side)
+        quat0 = self._robot_ee0_quat.get(side)
+        if Tee0 is None or quat0 is None:
+            return
+        pos, _ = _pos_quat_from_mat(Tee0)
+        pose = armHandPose()
+        pose.pos_xyz = [float(pos[0]), float(pos[1]), float(pos[2])]
+        pose.quat_xyzw = [float(quat0[0]), float(quat0[1]),
+                          float(quat0[2]), float(quat0[3])]
+        pose.elbow_pos_xyz = self._make_elbow_xyz(side)
+        if side == "left":
+            cmd.hand_poses.left_pose = pose
+        else:
+            cmd.hand_poses.right_pose = pose
+
+    def _publish_viz(self):
+        now = rospy.Time.now()
+        for side in ("right", "left"):
+            quat0 = self._robot_ee0_quat.get(side)
+            Tee0 = self._T_robot_ee0.get(side)
+            if quat0 is None or Tee0 is None:
+                continue
+
+            has_target = self._has_target_right if side == "right" else self._has_target_left
+            if has_target:
+                pos = self._target_right_pos if side == "right" else self._target_left_pos
+            else:
+                # 冻结: 使用 T_robot_ee0 的原始位置
+                pos, _ = _pos_quat_from_mat(Tee0)
+
+            msg = PoseStamped()
+            msg.header.stamp = now
+            msg.header.frame_id = "base_link"
+            msg.pose.position.x = pos[0]
+            msg.pose.position.y = pos[1]
+            msg.pose.position.z = pos[2]
+            msg.pose.orientation.x = quat0[0]
+            msg.pose.orientation.y = quat0[1]
+            msg.pose.orientation.z = quat0[2]
+            msg.pose.orientation.w = quat0[3]
+
+            pub = self.viz_right_pub if side == "right" else self.viz_left_pub
+            pub.publish(msg)
+
+    def _publish_raw_tracker_poses(self, poses: Dict[str, TrackerPose]):
+        now = rospy.Time.now()
+
+        if self.enable_right and self._serial_right:
+            tp = poses.get(self._serial_right)
+            if tp and tp.valid:
+                msg = PoseStamped()
+                msg.header.stamp = now
+                msg.header.frame_id = "steamvr_world"
+                msg.pose.position.x = float(tp.position[0])
+                msg.pose.position.y = float(tp.position[1])
+                msg.pose.position.z = float(tp.position[2])
+                msg.pose.orientation.x = float(tp.quaternion[0])
+                msg.pose.orientation.y = float(tp.quaternion[1])
+                msg.pose.orientation.z = float(tp.quaternion[2])
+                msg.pose.orientation.w = float(tp.quaternion[3])
+                self.raw_right_pub.publish(msg)
+
+        if self.enable_left and self._serial_left:
+            tp = poses.get(self._serial_left)
+            if tp and tp.valid:
+                msg = PoseStamped()
+                msg.header.stamp = now
+                msg.header.frame_id = "steamvr_world"
+                msg.pose.position.x = float(tp.position[0])
+                msg.pose.position.y = float(tp.position[1])
+                msg.pose.position.z = float(tp.position[2])
+                msg.pose.orientation.x = float(tp.quaternion[0])
+                msg.pose.orientation.y = float(tp.quaternion[1])
+                msg.pose.orientation.z = float(tp.quaternion[2])
+                msg.pose.orientation.w = float(tp.quaternion[3])
+                self.raw_left_pub.publish(msg)
+
+    # ── 自动发现 Tracker ──────────────────────────────────
+
+    def _auto_bind_serials(self, poses: Dict[str, TrackerPose]):
+        needed = 0
+        if self.enable_right and not self._serial_right:
+            needed += 1
+        if self.enable_left and not self._serial_left:
+            needed += 1
+        if needed == 0:
+            return
+
+        valid = [s for s, p in poses.items() if p.valid]
+        if len(valid) < needed:
+            return
+
+        # 右臂优先
+        if self.enable_right and not self._serial_right:
+            self._serial_right = valid[0]
+            rospy.loginfo("[vive_bridge] 右手 → %s", self._serial_right[-8:])
+
+        if self.enable_left and not self._serial_left and len(valid) >= 2:
+            candidate = [s for s in valid if s != self._serial_right]
+            if candidate:
+                self._serial_left = candidate[0]
+                rospy.loginfo("[vive_bridge] 左手 → %s", self._serial_left[-8:])
+
+    # ── 状态机 ────────────────────────────────────────────
+
+    def _tick_phase(self, poses: Dict[str, TrackerPose]):
+        if self._phase == Phase.INIT:
+            self._auto_bind_serials(poses)
+            if not self._check_serials_confirmed():
+                return
+
+            all_online = True
+            if self.enable_right:
+                rp = poses.get(self._serial_right)
+                if not (rp and rp.valid):
+                    all_online = False
+            if self.enable_left:
+                lp = poses.get(self._serial_left)
+                if not (lp and lp.valid):
+                    all_online = False
+
+            if all_online:
+                self._phase = Phase.WAIT_CALIB
+                rospy.loginfo("[vive_bridge] Tracker 就绪 → WAIT_CALIB")
+                rospy.loginfo("[vive_bridge] >>> rosservice call /vive_arm_bridge/calibrate")
+
+        elif self._phase in (Phase.PRE_ACTIVE, Phase.ACTIVE):
+            pass
+
+    # ── 主循环 ────────────────────────────────────────────
+
+    def run(self):
+        rate = rospy.Rate(self.publish_rate)
+        rospy.loginfo("[vive_bridge] 进入主循环 ...")
+
+        while not rospy.is_shutdown():
+            poses = self.tracker_source.get_poses()
+            self._tick_phase(poses)
+
+            if self.publish_raw_pose:
+                self._publish_raw_tracker_poses(poses)
+
+            if self._phase == Phase.ACTIVE:
+                self._update_targets(poses)
+                self._build_and_publish_cmd()
+                self._publish_viz()
+            else:
+                self._publish_viz()
+
+            rate.sleep()
+
+    def shutdown(self):
+        rospy.loginfo("[vive_bridge] 关闭中 ...")
+        self.tracker_source.shutdown()
+
+
+# =========================================================================
+# 入口
+# =========================================================================
+
+if __name__ == '__main__':
+    bridge = ViveArmBridge()
+    try:
+        bridge.run()
+    except rospy.ROSInterruptException:
+        pass
+    finally:
+        bridge.shutdown()

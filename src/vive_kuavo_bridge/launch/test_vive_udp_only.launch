@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+
+<launch>
+    <!-- ============================================================
+    test_vive_udp_only.launch
+
+```
+目的:
+  只测试 Windows SteamVR/OpenVR 端发送的 Vive Tracker UDP 数据，
+  是否能被下位机 vive_arm_bridge.py 接收并发布到 ROS topic。
+
+链路:
+  Windows:
+    vive_tracker_udp_sender.py
+      ↓ UDP :11051
+  下位机:
+    vive_arm_bridge.py
+      ↓
+    /vive_arm_bridge/viz/right_hand
+
+注意:
+  - 不启动 load_kuavo_real_wheel.launch
+  - 不启动 arms_ik_node
+  - 不发布 /kuavo_arm_traj
+  - 不要调用 /vive_arm_bridge/calibrate
+  - 只是验证 UDP → ROS topic
+============================================================ -->
+
+<!-- ========== UDP / Bridge 参数 ========== -->
+<arg name="source_type"          default="udp"/>
+<arg name="udp_port"             default="11051"/>
+<arg name="publish_rate"         default="30"/>
+<arg name="position_scale"       default="0.1"/>
+<arg name="max_delta_pos"        default="0.02"/>
+
+<!-- 当前只测右手 tracker -->
+<arg name="enable_left"          default="false"/>
+<arg name="enable_right"         default="true"/>
+
+<!-- 这里保留参数名，避免 bridge 缺参数；本测试不做 calibrate，所以不会真正读取 TF -->
+<arg name="ee_frame_left"        default="zarm_l7_end_effector"/>
+<arg name="ee_frame_right"       default="zarm_r7_end_effector"/>
+
+<!-- ========== Vive Bridge 节点 ========== -->
+<node pkg="vive_kuavo_bridge"
+      type="vive_arm_bridge.py"
+      name="vive_arm_bridge"
+      output="screen"
+      required="false">
+
+    <param name="source_type"     value="$(arg source_type)"/>
+    <param name="udp_port"        value="$(arg udp_port)"/>
+    <param name="publish_rate"    value="$(arg publish_rate)"/>
+    <param name="position_scale"  value="$(arg position_scale)"/>
+    <param name="max_delta_pos"   value="$(arg max_delta_pos)"/>
+
+    <param name="enable_left"     value="$(arg enable_left)"/>
+    <param name="enable_right"    value="$(arg enable_right)"/>
+
+    <param name="ee_frame_left"   value="$(arg ee_frame_left)"/>
+    <param name="ee_frame_right"  value="$(arg ee_frame_right)"/>
+
+    <param name="publish_raw_pose" value="true"/>
+</node>
+```
+
+</launch>

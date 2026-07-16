@@ -1,0 +1,322 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import numpy as np
+import rospy
+import tf
+import time
+
+from geometry_msgs.msg import PoseStamped
+from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
+from kuavo_msgs.msg import sensorsData, twoArmHandPoseCmd, twoArmHandPose, armHandPose
+from kuavo_msgs.srv import fkSrv
+
+class ArmQ0Provider:
+    def __init__(self, log_prefix):
+        self.log_prefix = log_prefix
+        self.topic = rospy.get_param("~q0_topic", "/sensors_data_raw")
+        self.topic_type = str(rospy.get_param("~q0_topic_type", "sensors_data")).lower()
+        default_start = int(rospy.get_param("/legRealDof", 4)) + int(rospy.get_param("/waistRealDof", 0))
+        self.arm_start_index = int(rospy.get_param("~q0_arm_start_index", default_start))
+        self.q0_units = str(rospy.get_param("~q0_units", "rad")).lower()
+        self.allow_zero_q0 = bool(rospy.get_param("~allow_zero_q0", False))
+        self.min_q0_norm = float(rospy.get_param("~min_q0_norm", 0.5))
+        self.max_q0_step = float(rospy.get_param("~max_q0_step", 0.5))
+        self.require_q0 = bool(rospy.get_param("~require_q0", True))
+        self.left_q = None
+        self.right_q = None
+        self.last_stamp = None
+
+        if self.topic_type == "sensors_data":
+            rospy.Subscriber(self.topic, sensorsData, self._sensors_data_cb, queue_size=1)
+        elif self.topic_type == "joint_state":
+            rospy.Subscriber(self.topic, JointState, self._joint_state_cb, queue_size=1)
+        elif self.topic_type == "float64_multi_array":
+            rospy.Subscriber(self.topic, Float64MultiArray, self._array_cb, queue_size=1)
+        else:
+            raise ValueError("unsupported q0_topic_type: %s" % self.topic_type)
+
+        rospy.loginfo("[%s] q0 source topic=%s type=%s arm_start=%d units=%s require=%s",
+                      self.log_prefix, self.topic, self.topic_type,
+                      self.arm_start_index, self.q0_units, self.require_q0)
+
+    def _convert_units(self, values):
+        arr = np.asarray(values, dtype=np.float64)
+        if self.q0_units == "deg":
+            arr = np.deg2rad(arr)
+        return arr
+
+    def _accept(self, left, right):
+        q = np.concatenate([left, right])
+        q_norm = float(np.linalg.norm(q))
+        if not self.allow_zero_q0 and q_norm < self.min_q0_norm:
+            rospy.logwarn_throttle(
+                2.0, "[%s] q0 rejected: norm %.6f < min_q0_norm %.6f",
+                self.log_prefix, q_norm, self.min_q0_norm)
+            return
+        if self.has_q0() and self.max_q0_step > 0.0:
+            prev = np.concatenate([self.left_q, self.right_q])
+            max_step = float(np.max(np.abs(q - prev)))
+            if max_step > self.max_q0_step:
+                rospy.logwarn_throttle(
+                    2.0, "[%s] q0 rejected: max step %.6f rad > %.6f rad",
+                    self.log_prefix, max_step, self.max_q0_step)
+                return
+        if (not self.allow_zero_q0 and
+                np.linalg.norm(left) < 1e-8 and np.linalg.norm(right) < 1e-8):
+            rospy.logwarn_throttle(2.0, "[%s] q0 rejected: left/right joint_angles are all zero", self.log_prefix)
+            return
+        self.left_q = left
+        self.right_q = right
+        self.last_stamp = rospy.Time.now()
+
+    def _accept_joint_array(self, data):
+        if len(data) < self.arm_start_index + 14:
+            rospy.logwarn_throttle(
+                2.0, "[%s] q0 topic %s length=%d, need at least %d",
+                self.log_prefix, self.topic, len(data), self.arm_start_index + 14)
+            return
+        start = self.arm_start_index
+        q = self._convert_units(data[start:start + 14])
+        self._accept(q[:7], q[7:14])
+
+    def _sensors_data_cb(self, msg):
+        self._accept_joint_array(list(msg.joint_data.joint_q))
+
+    def _array_cb(self, msg):
+        self._accept_joint_array(list(msg.data))
+
+    def _joint_state_cb(self, msg):
+        self._accept_joint_array(list(msg.position))
+
+    def has_q0(self):
+        return self.left_q is not None and self.right_q is not None
+
+    def wait_for_q0(self, timeout):
+        deadline = time.time() + float(timeout)
+        rate = rospy.Rate(50)
+        while not rospy.is_shutdown() and time.time() < deadline:
+            if self.has_q0():
+                return True
+            rospy.logwarn_throttle(2.0, "[%s] waiting for valid q0 from %s",
+                                   self.log_prefix, self.topic)
+            rate.sleep()
+        return self.has_q0()
+
+    def q_arm(self):
+        if not self.has_q0():
+            return None
+        return np.concatenate([self.left_q, self.right_q])
+
+    def apply_to_cmd(self, cmd):
+        if not self.has_q0():
+            if self.require_q0:
+                rospy.logwarn_throttle(2.0, "[%s] waiting for valid q0 from %s; IK cmd not published",
+                                       self.log_prefix, self.topic)
+            return not self.require_q0
+        cmd.joint_angles_as_q0 = True
+        cmd.hand_poses.left_pose.joint_angles = [float(x) for x in self.left_q]
+        cmd.hand_poses.right_pose.joint_angles = [float(x) for x in self.right_q]
+        return True
+
+
+class ReplayEePoseToIkCmdPreview:
+    def __init__(self):
+        rospy.init_node("replay_ee_pose_to_ik_cmd_preview", anonymous=False)
+
+        self.input_topic = rospy.get_param(
+            "~input_topic",
+            "/vive_arm_bridge/test/replay_right_ee_pose"
+        )
+
+        # 默认是测试 topic，不控制机器人
+        self.output_topic = rospy.get_param(
+            "~output_topic",
+            "/vive_arm_bridge/test/replay_ik_cmd_preview"
+        )
+
+        self.base_frame = rospy.get_param("~base_frame", "base_link")
+        self.left_ee_frame = rospy.get_param("~left_ee_frame", "zarm_l7_end_effector")
+        self.right_ee_frame = rospy.get_param("~right_ee_frame", "zarm_r7_end_effector")
+        self.left_elbow_frame = rospy.get_param("~left_elbow_frame", "l_forearm_pitch")
+        self.right_elbow_frame = rospy.get_param("~right_elbow_frame", "r_forearm_pitch")
+        self.fk_service_name = rospy.get_param("~fk_service", "/ik/fk_srv")
+        self.q0_wait_timeout = float(rospy.get_param("~q0_wait_timeout", 10.0))
+        self.enable_orientation = bool(rospy.get_param("~enable_orientation", False))
+
+        self.tf_listener = tf.TransformListener()
+        self.q0_provider = ArmQ0Provider("replay_ee_pose_to_ik_cmd_preview")
+
+        self.left_pos0 = None
+        self.left_quat0 = None
+        self.right_pos0 = None
+        self.right_quat0 = None
+        self.left_elbow0 = None
+        self.right_elbow0 = None
+
+        self.pub = rospy.Publisher(self.output_topic, twoArmHandPoseCmd, queue_size=10)
+
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] input : %s", self.input_topic)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] output: %s", self.output_topic)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] base  : %s", self.base_frame)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] left  : %s", self.left_ee_frame)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] right : %s", self.right_ee_frame)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] orientation enable=%s",
+                      self.enable_orientation)
+
+        # 先读取左右末端初始位姿
+        self.record_initial_poses()
+
+        # 初始位姿读取成功后，再订阅 replay_right_ee_pose
+        self.sub = rospy.Subscriber(self.input_topic, PoseStamped, self.cb, queue_size=10)
+
+    def pose_msg_to_arrays(self, pose):
+        pos = np.array(pose.pos_xyz, dtype=np.float64)
+        quat = np.array(pose.quat_xyzw, dtype=np.float64)
+        return pos, quat
+
+    def lookup_fk_poses(self):
+        if not self.q0_provider.wait_for_q0(self.q0_wait_timeout):
+            raise RuntimeError("no valid q0 from %s" % self.q0_provider.topic)
+        rospy.wait_for_service(self.fk_service_name, timeout=10.0)
+        fk_client = rospy.ServiceProxy(self.fk_service_name, fkSrv)
+        result = fk_client(self.q0_provider.q_arm().tolist())
+        if not result.success:
+            raise RuntimeError("%s failed for current q0" % self.fk_service_name)
+        left_pos, left_quat = self.pose_msg_to_arrays(result.hand_poses.left_pose)
+        right_pos, right_quat = self.pose_msg_to_arrays(result.hand_poses.right_pose)
+        return left_pos, left_quat, right_pos, right_quat
+
+    def lookup_pose(self, frame):
+        self.tf_listener.waitForTransform(
+            self.base_frame,
+            frame,
+            rospy.Time(0),
+            rospy.Duration(5.0)
+        )
+
+        trans, rot = self.tf_listener.lookupTransform(
+            self.base_frame,
+            frame,
+            rospy.Time(0)
+        )
+
+        pos = np.array(trans, dtype=np.float64)
+        quat = np.array(rot, dtype=np.float64)  # xyzw
+
+        return pos, quat
+
+    def lookup_elbow_or_fallback(self, side, frame, ee_pos):
+        try:
+            pos, _ = self.lookup_pose(frame)
+            rospy.loginfo(
+                "[replay_ee_pose_to_ik_cmd_preview] %s elbow0 %s = [%.4f %.4f %.4f]",
+                side, frame, pos[0], pos[1], pos[2]
+            )
+            return pos
+        except Exception as e:
+            rospy.logwarn(
+                "[replay_ee_pose_to_ik_cmd_preview] %s elbow TF '%s' unavailable (%s), elbow hint disabled",
+                side, frame, str(e)[:80]
+            )
+            return np.zeros(3, dtype=np.float64)
+
+    def record_initial_poses(self):
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] reading initial EE poses from FK ...")
+
+        (self.left_pos0, self.left_quat0,
+         self.right_pos0, self.right_quat0) = self.lookup_fk_poses()
+        self.left_elbow0 = np.zeros(3, dtype=np.float64)
+        self.right_elbow0 = np.zeros(3, dtype=np.float64)
+
+        rospy.loginfo(
+            "[replay_ee_pose_to_ik_cmd_preview] left FK ee0 pos  = [%.4f %.4f %.4f]",
+            self.left_pos0[0], self.left_pos0[1], self.left_pos0[2]
+        )
+        rospy.loginfo(
+            "[replay_ee_pose_to_ik_cmd_preview] right FK ee0 pos = [%.4f %.4f %.4f]",
+            self.right_pos0[0], self.right_pos0[1], self.right_pos0[2]
+        )
+
+    def make_arm_pose(self, pos, quat, elbow):
+        p = armHandPose()
+        p.pos_xyz = [
+            float(pos[0]),
+            float(pos[1]),
+            float(pos[2]),
+        ]
+        p.quat_xyzw = [
+            float(quat[0]),
+            float(quat[1]),
+            float(quat[2]),
+            float(quat[3]),
+        ]
+        p.elbow_pos_xyz = [
+            float(elbow[0]),
+            float(elbow[1]),
+            float(elbow[2]),
+        ]
+        return p
+
+    def cb(self, msg):
+
+        if self.left_pos0 is None or self.left_quat0 is None:
+            rospy.logwarn_throttle(2.0, "[replay_ee_pose_to_ik_cmd_preview] left ee0 not ready")
+            return
+
+        if self.right_pos0 is None or self.right_quat0 is None:
+            rospy.logwarn_throttle(2.0, "[replay_ee_pose_to_ik_cmd_preview] right ee0 not ready")
+            return
+        
+        # 右臂使用 replay 出来的目标 pose
+        right_pos = np.array([
+            msg.pose.position.x,
+            msg.pose.position.y,
+            msg.pose.position.z,
+        ], dtype=np.float64)
+
+        if self.enable_orientation:
+            right_quat = self.normalize_quat(np.array([
+                msg.pose.orientation.x,
+                msg.pose.orientation.y,
+                msg.pose.orientation.z,
+                msg.pose.orientation.w,
+            ], dtype=np.float64))
+        else:
+            right_quat = self.right_quat0
+
+        # 左臂冻结在启动时的初始位姿
+        left_pos = self.left_pos0
+        left_quat = self.left_quat0
+
+        cmd = twoArmHandPoseCmd()
+        cmd.hand_poses = twoArmHandPose()
+
+        cmd.use_custom_ik_param = False
+        cmd.joint_angles_as_q0 = False
+
+        # 0 表示 base_link，和你 vive_arm_bridge.py 里保持一致
+        cmd.frame = 0
+
+        cmd.hand_poses.left_pose = self.make_arm_pose(left_pos, left_quat, self.left_elbow0)
+        cmd.hand_poses.right_pose = self.make_arm_pose(right_pos, right_quat, self.right_elbow0)
+
+        if not self.q0_provider.apply_to_cmd(cmd):
+            return
+
+        self.pub.publish(cmd)
+
+    def normalize_quat(self, q):
+        n = np.linalg.norm(q)
+        if n < 1e-12:
+            return np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float64)
+        q = q / n
+        if q[3] < 0.0:
+            q = -q
+        return q
+
+
+if __name__ == "__main__":
+    node = ReplayEePoseToIkCmdPreview()
+    rospy.spin()

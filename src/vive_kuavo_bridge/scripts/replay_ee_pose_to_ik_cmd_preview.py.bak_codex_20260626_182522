@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import numpy as np
+import rospy
+import tf
+
+from geometry_msgs.msg import PoseStamped
+from kuavo_msgs.msg import twoArmHandPoseCmd, twoArmHandPose, armHandPose
+
+
+class ReplayEePoseToIkCmdPreview:
+    def __init__(self):
+        rospy.init_node("replay_ee_pose_to_ik_cmd_preview", anonymous=False)
+
+        self.input_topic = rospy.get_param(
+            "~input_topic",
+            "/vive_arm_bridge/test/replay_right_ee_pose"
+        )
+
+        # 默认是测试 topic，不控制机器人
+        self.output_topic = rospy.get_param(
+            "~output_topic",
+            "/vive_arm_bridge/test/replay_ik_cmd_preview"
+        )
+
+        self.base_frame = rospy.get_param("~base_frame", "base_link")
+        self.left_ee_frame = rospy.get_param("~left_ee_frame", "zarm_l7_end_effector")
+        self.right_ee_frame = rospy.get_param("~right_ee_frame", "zarm_r7_end_effector")
+
+        self.tf_listener = tf.TransformListener()
+
+        self.left_pos0 = None
+        self.left_quat0 = None
+        self.right_pos0 = None
+        self.right_quat0 = None
+
+        self.pub = rospy.Publisher(self.output_topic, twoArmHandPoseCmd, queue_size=10)
+
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] input : %s", self.input_topic)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] output: %s", self.output_topic)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] base  : %s", self.base_frame)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] left  : %s", self.left_ee_frame)
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] right : %s", self.right_ee_frame)
+
+        # 先读取左右末端初始位姿
+        self.record_initial_poses()
+
+        # 初始位姿读取成功后，再订阅 replay_right_ee_pose
+        self.sub = rospy.Subscriber(self.input_topic, PoseStamped, self.cb, queue_size=10)
+
+    def lookup_pose(self, frame):
+        self.tf_listener.waitForTransform(
+            self.base_frame,
+            frame,
+            rospy.Time(0),
+            rospy.Duration(5.0)
+        )
+
+        trans, rot = self.tf_listener.lookupTransform(
+            self.base_frame,
+            frame,
+            rospy.Time(0)
+        )
+
+        pos = np.array(trans, dtype=np.float64)
+        quat = np.array(rot, dtype=np.float64)  # xyzw
+
+        return pos, quat
+
+    def record_initial_poses(self):
+        rospy.loginfo("[replay_ee_pose_to_ik_cmd_preview] reading initial EE poses ...")
+
+        self.left_pos0, self.left_quat0 = self.lookup_pose(self.left_ee_frame)
+        self.right_pos0, self.right_quat0 = self.lookup_pose(self.right_ee_frame)
+
+        rospy.loginfo(
+            "[replay_ee_pose_to_ik_cmd_preview] left ee0 pos  = [%.4f %.4f %.4f]",
+            self.left_pos0[0], self.left_pos0[1], self.left_pos0[2]
+        )
+        rospy.loginfo(
+            "[replay_ee_pose_to_ik_cmd_preview] right ee0 pos = [%.4f %.4f %.4f]",
+            self.right_pos0[0], self.right_pos0[1], self.right_pos0[2]
+        )
+
+    def make_arm_pose(self, pos, quat):
+        p = armHandPose()
+        p.pos_xyz = [
+            float(pos[0]),
+            float(pos[1]),
+            float(pos[2]),
+        ]
+        p.quat_xyzw = [
+            float(quat[0]),
+            float(quat[1]),
+            float(quat[2]),
+            float(quat[3]),
+        ]
+        p.elbow_pos_xyz = [0.0, 0.0, 0.0]
+        return p
+
+    def cb(self, msg):
+
+        if self.left_pos0 is None or self.left_quat0 is None:
+            rospy.logwarn_throttle(2.0, "[replay_ee_pose_to_ik_cmd_preview] left ee0 not ready")
+            return
+
+        if self.right_pos0 is None or self.right_quat0 is None:
+            rospy.logwarn_throttle(2.0, "[replay_ee_pose_to_ik_cmd_preview] right ee0 not ready")
+            return
+        
+        # 右臂使用 replay 出来的目标 pose
+        right_pos = np.array([
+            msg.pose.position.x,
+            msg.pose.position.y,
+            msg.pose.position.z,
+        ], dtype=np.float64)
+
+        right_quat = np.array([
+            msg.pose.orientation.x,
+            msg.pose.orientation.y,
+            msg.pose.orientation.z,
+            msg.pose.orientation.w,
+        ], dtype=np.float64)
+
+        # 左臂冻结在启动时的初始位姿
+        left_pos = self.left_pos0
+        left_quat = self.left_quat0
+
+        cmd = twoArmHandPoseCmd()
+        cmd.hand_poses = twoArmHandPose()
+
+        cmd.use_custom_ik_param = False
+        cmd.joint_angles_as_q0 = False
+
+        # 0 表示 base_link，和你 vive_arm_bridge.py 里保持一致
+        cmd.frame = 0
+
+        cmd.hand_poses.left_pose = self.make_arm_pose(left_pos, left_quat)
+        cmd.hand_poses.right_pose = self.make_arm_pose(right_pos, right_quat)
+
+        self.pub.publish(cmd)
+
+
+if __name__ == "__main__":
+    node = ReplayEePoseToIkCmdPreview()
+    rospy.spin()

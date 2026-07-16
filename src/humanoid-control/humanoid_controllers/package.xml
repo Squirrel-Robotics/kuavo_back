@@ -50,6 +50,9 @@
     <depend>kuavo_led_controller</depend>
     <exec_depend>nodelet</exec_depend>
     <exec_depend>controller_manager</exec_depend>
+    <exec_depend>rospy</exec_depend>
+    <exec_depend>sensor_msgs</exec_depend>
+    <exec_depend>robot_state_publisher</exec_depend>
 
     <export>
         <controller_interface plugin="${prefix}/humanoid_controllers_plugins.xml"/>
